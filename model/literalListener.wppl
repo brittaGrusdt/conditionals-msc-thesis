@@ -1,0 +1,151 @@
+var networkPrior = function() {
+  var net = uniformDraw(["A implies C",
+                         "C implies A",
+                         "A ind. C"])
+  return net
+ }
+
+var pAIndependentC = function(){
+    var A = beta(1,1)
+    var C = beta(1,1)
+    var jointP = [A*C    , (1-A)* C,
+                  A*(1-C), (1-A)*(1-C)]
+    return jointP
+}
+
+var pADependentC = function(){
+    var C = beta(1,1)
+    var A_givenC = beta(1,1)
+    var A_givenNotC = beta(1,1)
+
+    var jointP = [A_givenC*C    , (1-A_givenC)* C,
+                  A_givenNotC*(1-C), (1-A_givenNotC)*(1-C)]
+    return jointP
+}
+
+var pCDependentA = function(){
+    var A = beta(1,1)
+    var C_givenA = beta(1,1)
+    var C_givenNotA =beta(1,1)
+
+    var jointP = [A*C_givenA    , (1-A)* C_givenNotA,
+                  A*(1-C_givenA), (1-A)*(1-C_givenNotA)]
+    return jointP
+}
+
+var statePrior = function() {
+  // a state is a pair of a causal network and a joint probability
+  // of all propositions
+  //
+  // joint probability table:
+  //          A          |   not A
+  //        -------------------------   ------
+  //  C    | P(A=1, C=1) | P(A=0, C=1)| P(C=1)
+  // not C | P(A=1, C=0) | P(A=0, C=0)| P(C=0)
+  //        -------------------------   ------
+  //       | P(A=1)      | P(A=0)     |   1
+    var causalNet = networkPrior()
+
+    if (causalNet == "A ind. C") {
+      var prob = pAIndependentC();
+      return({causalNet : causalNet,
+              jointP : prob})
+    }
+    if (causalNet == "A implies C"){
+      var prob = pCDependentA();
+      return({causalNet : causalNet,
+              jointP : prob})
+
+    }
+    if (causalNet == "C implies A"){
+      var prob = pADependentC();
+      return({causalNet : causalNet,
+              jointP : prob})
+    }
+}
+
+var utterances = ["A", "C", "If A, C", "If C, A"]
+
+var threshold = 0.9
+
+
+// meaning function to interpret the utterances
+var meaning = function(utterance, state){
+  // P(A) > threshold ?
+  utterance == "A" ?
+    state['jointP'][0] + state['jointP'][2] > threshold :
+
+  utterance == "C" ?
+    state['jointP'][0] + state['jointP'][1] > threshold :
+
+  utterance == "If A, C" ?
+    state['jointP'][0] > ((state['jointP'][2] + state['jointP'][0]) * threshold) :
+
+  utterance == "If C, A" ?
+    state['jointP'][0] > ((state['jointP'][1] + state['jointP'][0]) * threshold):
+
+  utterance == "" ?
+    true :
+  -1
+}
+
+// literal listener
+var literalListener = function(utterance){
+  Infer({method: "MCMC",
+         samples: 100000,
+         model: function(){
+           var state = statePrior();
+           condition(meaning(utterance, state))
+           return state
+         }})
+}
+
+var displayLL = function(utterance, marginalized){
+  display('Literal Listener hears: ' + utterance)
+  if(marginalized == 'C'){
+    viz(marginalize(literalListener(utterance), function(x)
+                    {x['jointP'][0]+x['jointP'][1]}))
+  } else if(marginalized == 'C|A'){
+    viz(marginalize(literalListener(utterance), function(x)
+                    {x['jointP'][0]/(x['jointP'][0]+x['jointP'][2])}))
+  } else if(marginalized == 'A'){
+    viz(marginalize(literalListener(utterance), function(x)
+                    {x['jointP'][0]+x['jointP'][2]}))
+  } else if(marginalized == 'A|C'){
+    viz(marginalize(literalListener(utterance), function(x)
+                    {x['jointP'][0]/(x['jointP'][0]+x['jointP'][1])}))
+  } else if(marginalized == 'table'){
+    display('A and C')
+    viz(marginalize(literalListener(utterance), function(x)
+                    {x['jointP'][0]}))
+    display('-A and C')
+    viz(marginalize(literalListener(utterance), function(x)
+                    {x['jointP'][1]}))
+    display('A and -C')
+    viz(marginalize(literalListener(utterance), function(x)
+                    {x['jointP'][2]}))
+    display('-A and -C')
+    viz(marginalize(literalListener(utterance), function(x)
+                    {x['jointP'][3]}))
+
+  }else if (marginalized == 'BN'){
+    viz(marginalize(literalListener(utterance), function(x) {x['causalNet']}))
+  }
+  else{
+    print('unknown marginalized variable. Use one of: C, C|A, A, A|C, table, BN')
+  }
+}
+// DISPLAY LITERAL LISTENER INFERENCES
+var marginal = 'BN'
+// var marginal = 'C|A'
+// displayLL("If A, C", marginal)
+// displayLL("If C, A", marginal)
+// displayLL("C", marginal)
+// displayLL("A", marginal)
+
+// DISPLAY LITERAL LISTENER  PRIORS
+// displayLL("", 'A')
+// displayLL("", 'C')
+// displayLL("", 'A|C')
+// displayLL("", 'C|A')
+// displayLL("", marginal)
