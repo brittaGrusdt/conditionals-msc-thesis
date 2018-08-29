@@ -1,0 +1,212 @@
+var granularity = 10
+var roundTo3 = cache(function(x){
+  return Math.round(x*1000)/1000
+  }
+)
+
+var midBins = map(function(x) {roundTo3(x/granularity + 1/(2*granularity))},
+                  _.range(0,granularity))
+
+var DiscreteBeta = cache(function(a, b){
+  Infer({model: function(){
+    categorical({
+      vs:midBins,
+      ps:map(function(x){
+        // var xi = x >= 1 ? 0.99 : x == 0 ? 0.01 : x
+        Math.exp(Beta({a, b}).score(x))
+      }, midBins)
+    })
+  }})
+})
+
+var networkPrior = function() {
+  var net = uniformDraw(["A implies C",
+                         "C implies A",
+                         "A ind. C"])
+  return net
+ }
+
+var pAIndependentC = function(){
+    var A = sample(DiscreteBeta(1,1))
+    var C = sample(DiscreteBeta(1,1))
+    var jointP = [A*C    , (1-A)* C,
+                  A*(1-C), (1-A)*(1-C)]
+    return jointP
+}
+
+var pADependentC = function(){
+    var C = sample(DiscreteBeta(1,1))
+    var A_givenC = sample(DiscreteBeta(1,1))
+    var A_givenNotC = sample(DiscreteBeta(1,1))
+
+    var jointP = [A_givenC*C    , (1-A_givenC)* C,
+                  A_givenNotC*(1-C), (1-A_givenNotC)*(1-C)]
+    return jointP
+}
+
+var pCDependentA = function(){
+    var A = sample(DiscreteBeta(1,1))
+    var C_givenA = sample(DiscreteBeta(1,1))
+    var C_givenNotA =sample(DiscreteBeta(1,1))
+
+    var jointP = [A*C_givenA    , (1-A)* C_givenNotA,
+                  A*(1-C_givenA), (1-A)*(1-C_givenNotA)]
+    return jointP
+}
+
+var statePrior = cache(function() {
+  // a state is a pair of a causal network and a joint probability
+  // of all propositions
+  //
+  // joint probability table:
+  //          A          |   not A
+  //        -------------------------   ------
+  //  C    | P(A=1, C=1) | P(A=0, C=1)| P(C=1)
+  // not C | P(A=1, C=0) | P(A=0, C=0)| P(C=0)
+  //        -------------------------   ------
+  //       | P(A=1)      | P(A=0)     |   1
+  Infer({method: "enumerate", model: function(){
+    var causalNet = networkPrior()
+
+    if (causalNet == "A ind. C") {
+      var prob = pAIndependentC();
+      return({causalNet : causalNet,
+              jointP : prob})
+    }
+    if (causalNet == "A implies C"){
+      var prob = pCDependentA();
+      return({causalNet : causalNet,
+              jointP : prob})
+
+    }
+    if (causalNet == "C implies A"){
+      var prob = pADependentC();
+      return({causalNet : causalNet,
+              jointP : prob})
+    }
+  }
+ })
+})
+
+var utterances = ["A", "C", "If A, C", "If C, A"]
+var threshold = 0.9
+
+// meaning function to interpret the utterances
+var meaning = function(utterance, state){
+  // P(A) > threshold ?
+  utterance == "A" ?
+    state['jointP'][0] + state['jointP'][2] > threshold :
+
+  utterance == "C" ?
+    state['jointP'][0] + state['jointP'][1] > threshold :
+
+  utterance == "If A, C" ?
+    state['jointP'][0] > ((state['jointP'][2] + state['jointP'][0]) * threshold) :
+
+  utterance == "If C, A" ?
+    state['jointP'][0] > ((state['jointP'][1] + state['jointP'][0]) * threshold):
+
+  utterance == "" ?
+    true :
+  -1
+}
+
+
+var literalListener = function(utterance, llreturn){
+  Infer({method: "enumerate",
+         model: function(){
+           var state = sample(statePrior());
+           condition(meaning(utterance, state))
+           return state[llreturn]
+         }})
+}
+
+// PRAGMATIC SPEAKER
+// set speaker optimality
+var alpha = 5
+// speaker utility factors
+var beta0 = 1
+var beta1 = 0
+display('proportion prob: ' + beta0)
+display('proportion BN: ' + beta1)
+
+// KL-divergence
+var KL = function(speaker_probability, listener_probability){
+  sum(map(function(cell) {
+    if(speaker_probability[cell] == 0 || listener_probability==0){
+      0
+    }else{
+    speaker_probability[cell] *
+       Math.log(speaker_probability[cell] / listener_probability[cell])
+    }}, _.range(4)))
+}
+
+var speakerBNandP = cache(function(state){
+  return Infer({model: function(){
+    var utterance = uniformDraw(utterances)
+    var LLprob = sample(literalListener(utterance, 'jointP'))
+    var KLdiv = - KL(state['jointP'], LLprob)
+    var LLbn = literalListener(utterance, 'causalNet')
+    factor(alpha*(beta0 * (KLdiv) +
+                  beta1 * LLbn.score(state['causalNet'])))
+    return utterance
+    }})
+})
+
+var speakerBN = cache(function(state){
+    return Infer({model: function(){
+       var utterance = uniformDraw(utterances)
+       var LLbn = literalListener(utterance, 'causalNet')
+       factor(alpha*LLbn.score(state))
+       return utterance
+      }
+   })
+})
+
+var speakerP = cache(function(state){
+    return Infer({model: function(){
+       var utterance = uniformDraw(utterances)
+       var LLprob = sample(literalListener(utterance, 'jointP'))
+       var KLdiv = - KL(state, LLprob)
+       factor(alpha*KLdiv)
+       return utterance
+      }
+   })
+})
+
+// pragmatic speaker
+var speaker = cache(function(state) {
+    if(beta0!=0 && beta1!=0){
+     return speakerBNandP(state)
+    } else if (beta0==0){
+      // speakerBN(state['causalNet'])
+      return speakerBN(state)
+    } else if (beta1==0){
+      //speakerP(state['jointP'])
+      return speakerP(state)
+    }
+})
+
+// PRAGMATIC LISTENER
+var listener = function(utterance, goal){
+  Infer({model: function(){
+    var state = sample(statePrior());
+    // TODO: very slow if state is given as {jointP:.., causalNet:..}
+    // and respective part is chosen in speaker function depending on beta0, beta1
+    observe(speaker(state[goal]),utterance)
+    return state['causalNet']
+  }})
+}
+
+// DISPLAY PRAGMATIC LISTENER INFERENCES
+var displayListener = cache(function(utterance, goal){
+  display(utterance)
+  viz(listener(utterance, goal))
+})
+
+// var goal='causalNet'
+var goal = 'jointP'
+displayListener("If A, C", goal)
+// displayListener("If C, A", goal)
+// displayListener("A",goal)
+// displayListener("C", goal)
