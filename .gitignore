@@ -4,5 +4,5 @@
 *.log
 *.out
 *.synctex.gz
-**/figs/*.pdf_tex
-**/figs/*.pdf
+*.pdf_tex
+**/figs/**/*.pdf
