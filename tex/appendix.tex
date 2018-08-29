@@ -1,0 +1,85 @@
+%\documentclass[10pt,a4paper]{article}
+%\usepackage[utf8]{inputenc}
+%\usepackage[english]{babel}
+%\usepackage{amsmath}
+%\usepackage{amsfonts}
+%\usepackage{amssymb}
+%\usepackage{graphicx}
+%\usepackage[left=2cm,right=2cm,top=2cm,bottom=2cm]{geometry}
+%\usepackage{svg}
+%\graphicspath{{./figs/}{figs/appendix/}}
+%
+%\author{Britta Grusdt}
+%\begin{document}
+\section*{Appendix}
+\label{sec:appendix}
+
+
+\subsection*{Literal Listener}
+\label{subsec:appendix-LL}
+
+\subsubsection*{Prior distributions}
+\label{subsec:appendix-LL-priors}
+
+\begin{figure}[ht]
+\centering
+\subfloat[Literal Listener's prior for $P(A|C)$.]{\label{fig:LLprior:AC}\includesvg[]{figs/LL-PAC-noUtt}}\qquad 
+\subfloat[Literal Listener's prior for $P(A)$.]{\label{fig:LLprior:A}\includesvg[]{figs/LL-PA-noUtt}}
+
+\subfloat[Literal Listener's prior for the Bayes Networks.]{\label{fig:LLprior:BN}\includesvg[width=0.3\textwidth]{figs/LL-PBN-noUtt}}
+\caption{Some Prior Distributions of the Literal Listener.}
+\label{fig:LLprior}
+\end{figure}
+
+\subsubsection*{Joint Probabilities}
+\label{subsec:appendix-LL-tables}
+
+ \begin{figure}[ht]
+ \centering
+ \subfloat[$A, C$]{\label{fig:LL-uttA-table0}\includesvg{figs/appendix/LL-uttA-table0}}\qquad
+\subfloat[$\neg A, C$]{\label{fig:LL-uttA-table1}\includesvg{figs/appendix/LL-uttA-table1}}
+
+ \subfloat[$A, \neg C$]{\label{fig:LL-uttA-table2}\includesvg{figs/appendix/LL-uttA-table2}} \qquad
+\subfloat[$\neg A, \neg C$]{\label{fig:LL-uttA-table3}\includesvg{figs/appendix/LL-uttA-table3}}  
+ \caption{Joint Probability distributions for the Literal Listener when he hears the utterance \textbf{\textit{A}}.}
+ \label{fig:LL-uttA-table}
+ \end{figure}
+
+
+ \begin{figure}[ht]
+ \centering
+ \subfloat[$A, C$]{\label{fig:LL-uttC-table0}\includesvg{figs/appendix/LL-uttC-table0}}\qquad
+\subfloat[$\neg A, C$]{\label{fig:LL-uttC-table1}\includesvg{figs/appendix/LL-uttC-table1}}
+
+ \subfloat[$A, \neg C$]{\label{fig:LL-uttC-table2}\includesvg{figs/appendix/LL-uttC-table2}} \qquad
+\subfloat[$\neg A, \neg C$]{\label{fig:LL-uttC-table3}\includesvg{figs/appendix/LL-uttC-table3}}  
+ \caption{Joint Probability distributions for the Literal Listener when he hears the utterance \textbf{\textit{C}}.}
+ \label{fig:LL-uttC-table}
+ \end{figure}
+
+
+
+ \begin{figure}[ht]
+ \centering
+ \subfloat[$A, C$]{\label{fig:LL-utt-if-A-C-table0}\includesvg{figs/appendix/LL-utt-if-A-C-table0}}\qquad
+\subfloat[$\neg A, C$]{\label{fig:LL-utt-if-A-C-table1}\includesvg{figs/appendix/LL-utt-if-A-C-table1}}
+
+ \subfloat[$A, \neg C$]{\label{fig:LL-utt-if-A-C-table2}\includesvg{figs/appendix/LL-utt-if-A-C-table2}} \qquad
+\subfloat[$\neg A, \neg C$]{\label{fig:LL-utt-if-A-C-table3}\includesvg{figs/appendix/LL-utt-if-A-C-table3}}  
+ \caption{Joint Probability distributions for the Literal Listener when he hears the utterance \textbf{\textit{If A, then C}}.}
+ \label{fig:LL-utt-if-A-C-table}
+ \end{figure}
+
+ \begin{figure}[ht]
+ \centering
+ \subfloat[$A, C$]{\label{fig:LL-utt-if-C-A-table0}\includesvg{figs/appendix/LL-utt-if-C-A-table0}}\qquad
+\subfloat[$\neg A, C$]{\label{fig:LL-utt-if-C-A-table1}\includesvg{figs/appendix/LL-utt-if-C-A-table1}}
+
+ \subfloat[$A, \neg C$]{\label{fig:LL-utt-if-C-A-table2}\includesvg{figs/appendix/LL-utt-if-C-A-table2}} \qquad
+\subfloat[$\neg A, \neg C$]{\label{fig:LL-utt-if-C-A-table3}\includesvg{figs/appendix/LL-utt-if-C-A-table3}}  
+ \caption{Joint Probability distributions for the Literal Listener when he hears the utterance \textbf{\textit{If C, then A}}.}
+ \label{fig:LL-utt-if-C-A-table}
+ \end{figure}
+
+
+%\end{document}

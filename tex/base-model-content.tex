@@ -1,0 +1,378 @@
+\section*{States}
+A state is defined as a pair of a joint probability table and a Bayesian (Causal) Network (BN). The state prior first samples a BN (uniformly distributed) and then samples a probability table based on the BN. In the base model, there are three possible BNs: One for the case that A depends on C, one for the case that the reverse is true, i.e. C depends on A and one for the case that A and C are independent. For building the joint probability tables, conditional or marginal probabilities are sampled from a uniform distribution over the intervall from 0 to 1 as shown in Table \ref{table:statePrior}~.
+
+\begin{table}[ht]
+\center
+\begin{tabular}{c|c}
+Bayes Net & sampled from uniform(0,1) \\\hline
+\textit{A implies C} & $P(C|A)$, $P(C|\neg A)$, $P(A)$ \\
+\textit{C implies A} & $P(A|C)$, $P(A|\neg C)$, $P(C)$ \\
+\textit{A independent C} &  $P(A)$, $P(C)$
+\end{tabular}
+\caption{Probabilities that are sampled from a uniform distribution over the intervall [0,1] for the three different Bayes Nets.}
+\label{table:statePrior}
+\end{table} 
+
+\FloatBarrier
+\section*{Meaning Function}
+
+The literal meaning of an utterance is determined by its corresponding probability: it must exceed a given threshold $t$ for making the utterance be true. In the first base model, the speaker can choose among four utterances, \textit{A}, \textit{C}, \textit{If A, then C} and \textit{If C, then A}. $P(A)$ and $P(C)$ correspond to the simple utterances \textit{A} and \textit{C} and are just the sums of the left column and the first row respectively while $P(C|A)$ and $P(A|C)$ correspond to the conditional utterances \textit{If A, then C} and \textit{If C, then A}. Since $P(C,A) = P(C|A) * P(A) = P(A|C) * P(C)$, the conditional probabilities can be written as shown in Equation \ref{eq:c-given-a} and \ref{eq:a-given-c}~. 
+
+\begin{subequations}
+\begin{align}
+P(C|A) = \frac{P(C,A)}{P(A)} \label{eq:c-given-a} \\
+P(A|C) = \frac{P(C,A)}{P(C)} \label{eq:a-given-c}
+\end{align}
+\end{subequations}
+
+The resulting condition for the meaning function can be formulated in two manners as can be seen in Figure \ref{code:meaning} for the utterance \textit{If A, then C}. The first is simply the direct implementation of equation \ref{eq:c-given-a} being greater than the threshold.  The reasoning behind the second expression is different: we want the probability of $A$ to be greater to a certain extent than the probability of $\neg A$ given $C$. $P(A|C)$ and $P(\neg A|C)$ are obtained by normalizing the upper row of Table \ref{table:joint} yielding $\frac{P(A,C)}{z}$ and $\frac{P(\neg A, C)}{z}$. We need $P(A|C) = \frac{P(A,C)}{z}$ to be greater than the threshold $t$, therefore $\frac{P(A,C)}{z} > t$ and since $\frac{P(A,C)}{z} + \frac{P(\neg A,C)}{z} = 1$, the following must hold: $\frac{P(\neg A,C)}{z} < 1-t$. Summarized, we get $\frac{P(A,C)}{t} > z$ and $\frac{P(\neg A, C)}{1-t} < z$ which results in $\frac{P(A,C)}{t} - \frac{P(\neg A, C)}{1-t} > 0$ when combined. This last expression is equivalent to the second condition in Figure \ref{code:meaning}~.
+
+
+\begin{figure}[ht]
+\begin{lstlisting}[language=javascript]
+  // utterance == "If C, then A"
+  state['jointP'][0] > (state['jointP'][1] + state['jointP'][0]) * threshold // (1)
+
+  (1-threshold) * state['jointP'][0] > state['jointP'][1] * threshold // (2)    
+\end{lstlisting}
+\caption{Condition for the utterance \textit{If C, then A} to be true  expressed in two different ways.}
+\label{code:meaning}
+\end{figure}
+
+
+
+
+\begin{table}[ht]
+\centering
+\begin{tabular}{lc|c}
+& $A$ & $\neg A$ \\
+\cline{2-3}
+\multicolumn{1}{l|}{$C$} & $P(C,A)$ & \multicolumn{1}{c|}{$P(C,\neg A)$}\\ \hline
+\multicolumn{1}{l|}{$\neg C$} & $P(\neg C, A$ & \multicolumn{1}{c|}{$P(\neg C, \neg A)$} \\\cline{2-3}
+\end{tabular}
+\caption{Joint Probability Table.}
+\label{table:joint}
+\end{table}
+
+
+\begin{figure}
+\begin{lstlisting}
+var granularity = 20
+var roundTo3 = cache(function(x){
+  return Math.round(x*1000)/1000
+  }
+)
+
+var midBins = map(function(x) {roundTo3(x/granularity + 1/(2*granularity))}, 
+                  _.range(0,granularity))
+
+var DiscreteBeta = cache(function(a, b){
+  Infer({model: function(){
+    categorical({
+      vs:midBins,
+      ps:map(function(x){
+        Math.exp(Beta({a, b}).score(x))
+      }, midBins)
+    })
+  }})
+})
+\end{lstlisting}
+\caption{WebPPL Code for the discrete version of the beta distribution.}
+\label{code:discreteBeta}
+\end{figure}
+
+In order to get discrete values, we define a discrete version of the Beta distribution as shown in Figure \ref{code:discreteBeta}~. It is important to set the granularity of the bins not too broad. When it was set to five, errors due to rounding had a huge impact which was manifested by different results for the two (equal) expressions from Figure \ref{code:meaning}~. Setting the granularity value of 10 was sufficient to get rid of this problem. Also, the results for the distribution of the pragmatic speaker were, independent from the formulation of the meaning function, substantially different depending on the granularity value. This is demonstrated in Figure \ref{fig:impactGranularity}~. 
+
+
+\begin{figure}
+\centering
+\subfloat[Granularity value for discrete beta values set to 5.]{\includesvg{figs/speaker-granularity5}} \qquad
+\subfloat[Granularity value for discrete beta values set to 10.]{\includesvg{figs/speaker-granularity10}}
+\caption{Speaker distribution over utterances for different granularity values of the discrete beta distribution from which we sample to get the prior joint probability tables of the listener. The pragmatic constant $\alpha$ was set to 5 and the speaker's joint probability table was [0.2, 0.0, 0.8, 0.0] $(P(C,A), P(C,\neg A), P(\neg C, A), P(\neg C, \neg A))$. }
+\label{fig:impactGranularity}
+\end{figure}
+
+\FloatBarrier
+\section*{Literal Listener}
+
+\begin{figure}[ht]
+\subfloat[LL hears \textit{A}.]{\includesvg{figs/figs-week1/PC_uttA}}\qquad
+\subfloat[LL hears \textit{C}.]{\includesvg{figs/figs-week1/PC_uttC}}\qquad
+
+\subfloat[LL hears \textit{If A, C}.]{\includesvg{figs/figs-week1/PC_uttAC}}\qquad 
+\subfloat[LL hears \textit{If C, A}.]{\includesvg{figs/figs-week1/PC_uttCA}}
+\caption{Distributions $P(C)$ the Literal Listener infers depending on the heard utterances when the threshold of the meaning function is set to 0.9.}
+\label{fig:LL-distributions-P-C}
+\end{figure}
+
+
+\begin{figure}[ht]
+\subfloat[LL hears \textit{A}.]{\includesvg{figs/figs-week1/LL-A-marginal-CgivenA}}\qquad
+\subfloat[LL hears \textit{C}.]{\includesvg{figs/figs-week1/LL-C-marginal-CgivenA}}\qquad
+
+\subfloat[LL hears \textit{If A, C}.]{\includesvg{figs/figs-week1/LL-ifAC-marginal-CgivenA}}\qquad
+\subfloat[LL hears \textit{If C, A}.]{\includesvg{figs/figs-week1/LL-ifCA-marginal-CgivenA}}
+\caption{Distributions $P(C|A)$ the Literal Listener infers depending on the heard utterances when the threshold of the meaning function is set to 0.9.}
+\label{fig:LL-distributions-P-CA}
+\end{figure}
+
+The Literal Listener is at the end of the reasoning chain in the rational speech act model. He conditions the statePrior on the meaning of the utterance that he heard. The prior distributions for $P(A|C), P(A)$ and  $P(\mathrm{Bayes Net})$ from the literal listener, i.e. he has not heard any utterance yet, are shown in Figure \ref{fig:LLprior}. When the Literal Listener hears an utterance, he only considers those probability tables where the corresponding probability of the utterance exceeds a given threshold. Figure \ref{fig:LL-distributions-P-C} and Figure \ref{fig:LL-distributions-P-CA} show the probability distributions for $P(C)$ and  $P(C|A)$ of the literal Listener for all possible utterances that he may have heard. Figure \ref{code:LL} shows the WebPPL code for the Literal Listener.
+
+In Figure \ref{fig:LL-distributions-P-C}, when the literal listener hears \textit{C}, the distribution of $P(C)$ is the equally weighted sum of the normalized pdfs of $C$ for the three different Bayes Networks where $C>0.9$. In the two Bayes Nets \textit{C implies A} and \textit{A indpendent C}, $C$ is uniformly distributed (from 0.9 to 1, the pdf is:$1/(1-0.9)=10$) and in the Bayes Net \textit{A implies C}, the distribution looks like a broad bell as shown in Figure \ref{fig:LLprior:AC}~. Therefore $C$ lies in the intervall $[0.9,1]$ with slightly decreasing pdf values for increasing $C$ values.
+
+\todo{die anderen nachvollziehen!!}
+
+\begin{figure}[ht]
+\begin{lstlisting}
+var literalListener = function(utterance, focus){
+  Infer({method: "enumerate",
+         model: function(){
+           var state = sample(statePrior());
+           condition(meaning(utterance, state))
+           if(focus == 'BN'){
+             return state['causalNet']
+           }
+           else{return state}  
+         }})
+}
+\end{lstlisting}
+\caption{WebPPL code for the Literal Listener.}
+\label{code:LL}
+\end{figure}
+
+\begin{figure}[htp]
+\centering
+\begin{tikzpicture}[sibling distance=10em,
+  every node/.style = {shape=rectangle, rounded corners,
+    draw, align=center, top color=white, bottom color=blue!20}]]
+  \node {Bayes Network}
+    child { node[label=below:$P(C|A)\sim \textrm{unif(0,1)}$] {A ind. C}  edge from parent node{$\frac{1}{3}$}}    
+    child { node[label=below:$P(C|A)\sim \textrm{unif(0,1)}$] {A implies C}  edge from parent node{$\frac{1}{3}$}}
+    child { node[label=below:{\includesvg[width=0.15\columnwidth]{figs/pdf-cgivena-bn-ca}}] {C implies A}  edge from parent node{$\frac{1}{3}$}};
+\end{tikzpicture}
+\caption{Distributions of $P(C|A)$ for each Bayes Network.}
+\label{graph:PCAperNet}
+\end{figure}
+
+Figure \ref{fig:LL-BN} shows the Literal Listener's distributions over the three Bayes Networks. These distributions result from conditioning on the corresponding probabilities of the heard utterances for each Bayes Network respectively. Figure \ref{graph:PCAperNet} shows the distributions for $P(C|A)$, i.e. the Literal Listener heard the utterance \textit{If A, then C}, for each of the three Bayes Nets. In the case of the two uniformly distribution, $P(P(C|A)>0.9)=0.1$ while $P(P(C|A)>0.9) \approx 0.16$ for the network $C \rightarrow A$. Therefore, the Literal Listener puts equal probability mass on the Bayes Nets $A \rightarrow C$ and $A$ independent $C$ and most on the network $C \rightarrow A$.
+
+
+\begin{figure}[ht]
+\centering
+\subfloat[LL hears \textit{A}.]{\includesvg{figs/LL-BayesNet-utt-A}}\qquad
+\subfloat[LL hears \textit{C}.]{\includesvg{figs/LL-BayesNet-utt-C}}
+
+\subfloat[LL hears \textit{If A, then C}.]{\includesvg{figs/LL-BayesNet-utt-A-C}}\qquad
+\subfloat[LL hears \textit{If C, then A}.]{\includesvg{figs/LL-BayesNet-utt-C-A}}
+
+\caption{Literal Listener's distributions over Bayes Networks.}
+\label{fig:LL-BN}
+\end{figure}
+
+
+\FloatBarrier
+\section*{Pragmatic Speaker}
+
+There are two versions of the pragmatic speaker. In the first, the pragmatic speaker is implemented as minimizing the difference between the joint probability table she has in mind and the joint probability table of the literal listener. This difference is represented by the \textit{Kullback-Leibler divergence} ($KL_D$) which measures how different two probability distributions are, i.e. how well a distribution $Q$ approximates a true distribution $P$. The greater $KL_D$ is, the greater is the difference of the two distributions. It is always positive and for identical distributions it is equal to 0. The factor statement in the code of the Pragmatic Speaker (Figure \ref{code:speaker}) adds the argument value to the log probability of the current execution. The greater $KL_D$ is, the smaller the log probability shall be and therefore we use $-KL_D$ inside the factor statement.
+
+In the second version of the pragmatic speaker, the Literal Listener does not return the entire state, but the marginalized distribution for the three Bayes Networks. The pragmatic speaker has a Bayes Network in mind and chooses an utterance proportional to the probability that the Literal Listener puts on that specific Bayes Network. 
+
+
+\begin{figure}[ht]
+\begin{equation}
+D_{\mathrm {KL} }(P\|Q)= \sum _{i}P(i)\,\log {\frac {P(i)}{Q(i)}}
+\end{equation}
+\caption{Definition of the Kullback-Leibler divergence for discrete probability distributions $P$ and $Q$. It is the amount of information that is lost when $P$ is approximated by $Q$. It is always $>=0$. The best value 0 is obtained if $P$ and $Q$ are identical. When $Q$ overestimates an event, the quotient of the log is $<1$ and therefore this summand is negative which brings the result of $D_{KL}$ closer to 0. The worst effect on the Kullback-Leibler divergence is when an event is underestimated to a great extent since then the logarithm becomes large.}
+\label{eq:KLDiv}
+\end{figure}
+
+\begin{figure}[ht]
+\begin{minipage}{\linewidth}
+\begin{lstlisting}[language=javascript]
+var speaker = cache(function(state, goal) {
+  return Infer({model: function(){
+    var utterance = uniformDraw(utterances)
+    var LL = literalListener(utterance, goal)  
+    if(goal == 'probs'){
+      // speaker wants to transmit the probabilites
+      var LLprob = sample(LL)['jointP']
+      var KLdiv = -KL(state, LLprob)
+      factor(alpha * (KLdiv-cost(utterance)))
+    }else{
+      // speaker wants to transmit the causal net
+      factor(alpha * LL.score(state))
+    }
+   return utterance
+  }})
+})
+\end{lstlisting}
+\caption{WebPPl code for the pragmatic speaker.}
+\label{code:speaker}
+\end{minipage}
+\end{figure}
+
+\FloatBarrier
+\subsection*{Speaker Results}
+\subsubsection*{Version 1: Transferring Probabilities}
+For all plots, the granularity of the beta distribution was set to 20 and the value for the optimality parameter $\alpha$ was set to 5.
+
+\begin{table}[ht]
+\centering
+\begin{tabular}{|l|c|c|}
+\hline 
+ & A & $\neg$ A \\ \hline 
+C & 0.8 & 0 \\
+$\neg$ C & 0.2 & 0\\ \hline
+ \end{tabular} \qquad
+\begin{tabular}{|l|c|c|}
+\hline 
+ & A & $\neg$ A \\ \hline 
+C & 0.2 & 0 \\
+$\neg$ C & 0.8 & 0\\ \hline
+ \end{tabular}
+
+\subfloat[speaker probabilites Ex. 1.]{\label{table:speakerPex1}\begin{tabular}{c|c}
+probs & values\\ \hline
+$P(A|C)$ & 1 \\
+$P(C|A)$ & 0.8
+\end{tabular}}  \qquad
+\subfloat[speaker probabilities Ex. 2.]{\label{table:speakerPex2}\begin{tabular}{c|c}
+probs & values\\ \hline
+$P(A|C)$ & 1 \\
+$P(C|A)$ & 0.2
+\end{tabular}}
+\caption{Examplary speaker probability tables.}
+ \label{table:PspeakerA}
+ \end{table}
+ 
+ \begin{figure}[ht]
+ \centering
+ \subfloat[State probability table was set to the one shown in Table \ref{table:speakerPex1}~.]{\label{fig:speakerExample1}\includesvg{figs/speaker-08-0-02-0}}\qquad
+ \subfloat[State probability table was set to the one shown in Table \ref{table:speakerPex2}~. ]{\label{fig:speakerExample2}\includesvg{figs/speaker-02-0-08-0}}
+\caption{Probability distributions over utterances for the pragmatic speaker given the state probabilites of Table \ref{table:PspeakerA}.}
+\label{fig:speakerExamples12} 
+ \end{figure}
+ 
+The results for the speaker when her state probability table is set to the one in Table \ref{table:speakerPex1} which are shown in Figure \ref{fig:speakerExample1},  seem reasonable . Since $P(A)=1$, it is a good choice for the speaker to produce the utterance \textit{A}. It is also reasonable to choose the utterance \textit{If C, then A} for the given state probabilites since $P(A|C)$ is also $1$. The remaining two utterances also receive some probability mass which is as expected since $P(C|A)$ and $P(A)$ are both high ($0.8$).
+ 
+
+When considering the state probabilites of Table \ref{table:speakerPex2}~ the speaker's distribution is similar as shown in Figure \ref{fig:speakerExample2}~. The most likely utterance is \textit{A} ($>0.6$) followed by \textit{If C, then A}. The speaker does not put any probability on the utterances \textit{C} and \textit{If A, then C} whose corresponding probabilities are both $0.2$. However, when the speaker is less pragmatic, i.e. the optimality parameter $\alpha$ is smaller (here $\alpha =5$), there is some probability mass also on these two utterances.
+
+\begin{figure}
+\begin{equation}
+P_S (u|w) \propto exp(\alpha U(u;w))
+\end{equation}
+\caption{Definition Pragmatic Speaker. She is represented as a distribution over possible utterances.}
+\label{eq:pragmaticSpeaker}
+\end{figure}
+
+\begin{table}[ht]
+\centering
+\begin{tabular}{|l|c|c|}
+\hline 
+ & A & $\neg$ A \\ \hline 
+C & 0 & 0.8 \\
+$\neg$ C & 0 & 0.2\\ \hline
+ \end{tabular} \qquad
+ \begin{tabular}{|l|c|c|}
+\hline 
+ & A & $\neg$ A \\ \hline 
+C & 0 & 0.2 \\
+$\neg$ C & 0 & 0.8\\ \hline
+ \end{tabular}
+
+\subfloat[speaker probabilites Ex. 3.]{\label{table:speakerPex3}\begin{tabular}{c|c}
+probs & values\\ \hline
+$P(A|C)$ & 0 \\
+$P(C|A)$ & 0 \\
+$P(\neg A|C)$ & 1\\
+$P(C|\neg A)$ & 0.8\\
+
+\end{tabular}}  \qquad
+\subfloat[speaker probabilities Ex. 4.]{\label{table:speakerPex4}\begin{tabular}{c|c}
+probs & values\\ \hline
+$P(A|C)$ & 0 \\
+$P(C|A)$ & 0 \\
+$P(\neg A|C)$ & 1\\
+$P(C|\neg A)$ & 0.2\\
+\end{tabular}}
+\caption{Examplary speaker probability tables.}
+ \label{table:PspeakerNotA}
+\end{table}
+
+
+
+ \begin{figure}[ht]
+ \centering
+ \subfloat[State probability table was set to the one shown in Table \ref{table:speakerPex3}~.]{\label{fig:speakerExample3}\includesvg{figs/speaker-08-0-02-0-rightCol}} \qquad
+\subfloat[State probability table was set to the one shown in Table \ref{table:speakerPex4}~.]{\label{fig:speakerExample4}\includesvg{figs/speaker-02-0-08-0-rightCol}} 
+ \caption{Probability distributions over utterances for the pragmatic speaker given the state probabilites of Table \ref{table:PspeakerNotA}~.}
+ \label{fig:speakerExamples34}
+ \end{figure}
+ 
+When the speaker's state probability is only distributed on those events where $\neg A$ holds (see Table \ref{table:PspeakerNotA}~), and therefore $P(A)=0)$, most of the possible utterances are not reasonable for the speaker. When considering the state probabilities of Table \ref{table:speakerPex3}~, the best would be to say that $A$ is false since $P(\neg A)=1$ or that $A$ is false when $C$ is true since $P(\neg A|C)$ is also $1$. The only possible utterance which is not completely false is \textit{C} since $P(C)=0.8$. This is also the utterance that the speaker chooses with highest probability ($0.55$). The remaining probability mass is put on the utterance \textit{If A, then C} which is not true considering the speaker's state probability. In section \ref{subsec:appendix-LL-tables}~, the distributions over the entries of the Literal Listener's joint probability tables are plotted. With the speaker's state probabilites from Table \ref{table:speakerPex3}, the entries on the left column, i.e. where $A$ is true, are always overestimated by the Literal Listener. The worst for the Kullback-Leibler divergence, however, is the underestimation of events. When the Literal Listener hears \textit{A} or \textit{If C, then A}, the entry $\neg A, C$ is highly underestimated ($<0.1$), see Figures \ref{fig:LL-uttA-table0} and \ref{fig:LL-utt-if-C-A-table0}~. For the other two utterances, there is no such high underestimation and therefore the pragmatic speaker distributes the probability mass on these utterances (\textit{C} and \textit{If A, then C}). 
+
+When these state probabilities are switched, see Table \ref{table:speakerPex4}~, the probability mass is distributed among the utterances \textit{If A then C} ($>0.9$) and \textit{If C, then A} which are both not true. For the simple utterances \textit{A} and \textit{C}, the underestimation for the entry $\neg A, \neg C$ is very large since the state probability is $0.8$ and the probability is distributed on values only upto $0.08$. For the conditional utterances, there is also an underestimation, which is however less distinctive. Therefore the speaker prefers the conditional utterances and among these, the utterance \textit{If A, then C} where the entry for $C, \neg A$ is rather overestimated and not underestimated as it is the case for the utterance \textit{If C, then A}.
+
+\FloatBarrier
+\subsubsection*{Version 2: Transferring Causal Networks}
+
+\begin{figure}[htp]
+\subfloat[Bayes Net to transfer: \textit{A implies C}.]{\includesvg{figs/speaker-BN-A-implies-C}}\qquad
+\subfloat[Bayes Net to transfer: \textit{C implies A}.]{\includesvg{figs/speaker-BN-C-implies-A}}\qquad
+\subfloat[Bayes Net to transfer: \textit{A independent C}.]{\includesvg{figs/speaker-BN-A-ind-C}}
+\caption{Speaker's probabilites for utterances given that she wants to transmit the underlying causal relations.}
+\label{fig:speaker-bns}
+\end{figure}
+
+The results for the speaker's probability distributions over utterances, given that she wants to transmit the underlying causal network, are shown in Figure \ref{fig:speaker-bns}~. They can be understood considering the Literal Listener's distributions over Bayes Networks as shown in Figure \ref{fig:LL-BN}~. As desired, when the speaker wants to transfer that event $A$ is independent of event $B$, she chooses the utterance \textit{A} or \textit{C} with equal probability ($>0.4$). However, in order to transfer the conditional networks (\textit{A implies C}, \textit{C implies A}), in most cases the speaker chooses the contrary conditional utterance, i.e. \textit{If C, A} and \textit{If A, C}, or the antecedent (\textit{A}, \textit{C}).  
+
+
+\FloatBarrier
+\section*{Pragmatic Listener}
+
+\begin{figure}[htp]
+\begin{equation}
+P_L (w|u) \propto P_S (u|w) P(w)
+\end{equation}
+\caption{Definition of Pragmatic Listener. He is represented as a distribution over worlds (states).}
+\label{eq:pragmaticListener}
+\end{figure}
+
+The pragmatic listener is defined as shown in Equation \ref{eq:pragmaticListener}~ and as WebPPL code in Figure \ref{code:pragmaticListener}~.  The distributions of the Pragmatic Listener over states, that he infers given that the Literal Listener is represented as the marginal distribution over joint probabilities, are shown in Figure \ref{fig:pragmaticListenerGivenJointP}~. The pragmatic listener puts more probability on the state that \textit{A implies C} than on the state where $A$ and $C$ are independent, as is desirable. Yet, the difference is only marginal, the probability mass is almost uniformly distributed over the three causal networks. The results look very different when the speaker aims at transferring the underlying causal network instead of the joint probabilities as can be seen in Figure \ref{fig:pragmaticListenerGivenBN}~. The Pragmatic Listener interpretes the simple utterances, e.g. \textit{A}, as the corresponding event implying the other event ($A$ implies $C$) or as two independent events. For the conditional utterances, most of the probability mass is put on the contrary implication, e.g. on $C$ implies $A$ for the utterance \textit{If A, C}, as before, but the remaining two causal network states only receive very little probability mass (both $0.1$).
+
+\begin{figure}[htp]
+\begin{lstlisting}[language=javascript]
+var listener = function(utterance, goal){
+  Infer({model: function(){
+    var state = sample(statePrior());
+    observe(speaker(state[goal], goal),utterance)
+    return state['causalNet']
+  }})
+}
+\end{lstlisting}
+\caption{WebPPL code for the Pragmatic Listener.}
+\label{code:pragmaticListener}
+\end{figure}
+
+\begin{figure}[htp]
+\centering
+\subfloat[Heard utterance: \textit{A}.]{\includesvg{figs/pragmatic-listener/PL-utt-a}}\qquad
+\subfloat[Heard utterance: \textit{C}.]{\includesvg{figs/pragmatic-listener/PL-utt-c}}
+
+\subfloat[Heard utterance: \textit{If A, C}.]{\includesvg{figs/pragmatic-listener/PL-utt-if-a-c}}\qquad
+\subfloat[Heard utterance: \textit{If C, A}.]{\includesvg{figs/pragmatic-listener/PL-utt-if-c-a}}
+\caption{Results for the Pragmatic Listener depending on the utterances he has heard given that the Literal Listener is represented as distribution over joint probabilities. Due to the time consumption for the computations, the granularity for the discrete beta distribution was set to 10.}
+\label{fig:pragmaticListenerGivenJointP}
+\end{figure}
+
+\begin{figure}[htp]
+\centering
+\subfloat[Heard utterance: \textit{A}.]{\includesvg{figs/pragmatic-listener/PL-BN-utt-a}}\qquad
+\subfloat[Heard utterance: \textit{C}.]{\includesvg{figs/pragmatic-listener/PL-BN-utt-c}}
+
+\subfloat[Heard utterance: \textit{If A, C}.]{\includesvg{figs/pragmatic-listener/PL-BN-utt-if-a-c}}\qquad
+\subfloat[Heard utterance: \textit{If C, A}.]{\includesvg{figs/pragmatic-listener/PL-BN-utt-if-c-a}}
+\caption{Results for the Pragmatic Listener depending on the utterances he has heard given that the Literal Listener is represented as distribution over Bayes Networks.}
+\label{fig:pragmaticListenerGivenBN}
+\end{figure}
