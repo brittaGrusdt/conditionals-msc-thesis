@@ -6,3 +6,4 @@
 *.synctex.gz
 *.pdf_tex
 **/figs/**/*.pdf
+**/__pycache__
