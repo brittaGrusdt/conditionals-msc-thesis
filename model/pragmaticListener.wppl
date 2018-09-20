@@ -1,4 +1,4 @@
-var granularity = 10
+var granularity = 15
 var roundTo3 = cache(function(x){
   return Math.round(x*1000)/1000
   }
@@ -91,20 +91,39 @@ var statePrior = cache(function() {
 var utterances = ["A", "C", "If A, C", "If C, A"]
 var threshold = 0.9
 
+// marginal probabilities
+var pa = cache(function(x){return x[0]+x[2]})
+var pna = cache(function(x){return x[1]+x[3]})
+var pc = cache(function(x){return x[0]+x[1]})
+var pnc = cache(function(x){return x[2]+x[3]})
+
+// joint probabilities
+var pAandC = cache(function(x){return x[0]})
+var pAandNC = cache(function(x){return x[2]})
+var pNAandC = cache(function(x){return x[1]})
+var pNAandNC = cache(function(x){return x[3]})
+
+//conditional probabilities
+var pAgivenC = cache(function(x){return x[0]/pc(x)})
+var pAgivenNC = cache(function(x){return x[2]/pnc(x)})
+var pNAgivenC = cache(function(x){return x[1]/pc(x)})
+var pNAgivenNC = cache(function(x){return x[3]/pnc(x)})
+
+
 // meaning function to interpret the utterances
 var meaning = function(utterance, state){
   // P(A) > threshold ?
   utterance == "A" ?
-    state['jointP'][0] + state['jointP'][2] > threshold :
+    pa(state['jointP']) > threshold :
 
   utterance == "C" ?
-    state['jointP'][0] + state['jointP'][1] > threshold :
+    pc(state['jointP']) > threshold :
 
   utterance == "If A, C" ?
-    state['jointP'][0] > ((state['jointP'][2] + state['jointP'][0]) * threshold) :
+    state['jointP'][0] > pa(state['jointP']) * threshold :
 
   utterance == "If C, A" ?
-    state['jointP'][0] > ((state['jointP'][1] + state['jointP'][0]) * threshold):
+    state['jointP'][0] > pc(state['jointP']) * threshold:
 
   utterance == "" ?
     true :
@@ -175,14 +194,12 @@ var speakerP = cache(function(state){
 })
 
 // pragmatic speaker
-var speaker = cache(function(state) {
+var speaker = cache(function(state, goal) {
     if(beta0!=0 && beta1!=0){
      return speakerBNandP(state)
-    } else if (beta0==0){
-      // speakerBN(state['causalNet'])
+    } else if (goal=='causalNet'){
       return speakerBN(state)
-    } else if (beta1==0){
-      //speakerP(state['jointP'])
+    } else if (goal=='jointP'){
       return speakerP(state)
     }
 })
@@ -191,22 +208,29 @@ var speaker = cache(function(state) {
 var listener = function(utterance, goal){
   Infer({model: function(){
     var state = sample(statePrior());
-    // TODO: very slow if state is given as {jointP:.., causalNet:..}
-    // and respective part is chosen in speaker function depending on beta0, beta1
-    observe(speaker(state[goal]),utterance)
-    return state['causalNet']
+    observe(speaker(state[goal], goal),utterance)
+    return state
   }})
 }
 
-// DISPLAY PRAGMATIC LISTENER INFERENCES
-var displayListener = cache(function(utterance, goal){
-  display(utterance)
-  viz(listener(utterance, goal))
-})
 
-// var goal='causalNet'
-var goal = 'jointP'
-displayListener("If A, C", goal)
+// DISPLAY PRAGMATIC LISTENER INFERENCES
+var displayListener = function(utterance, goal, visualize){
+  // visualize: 'causalNet' or one of the probability functions above
+  display('Pragmatic Listener hears: ' + utterance)
+  var pragListener = listener(utterance, goal)
+  if(visualize=='causalNet'){
+    viz(marginalize(pragListener, function(state){return state['causalNet']}))
+  } else{
+    viz(marginalize(pragListener, function(state){return visualize(state['jointP'])}))
+  }
+}
+
+
+var goal='causalNet'
+//var goal = 'jointP'
+var visualize = 'causalNet'
+displayListener("If A, C", goal, visualize)
 // displayListener("If C, A", goal)
 // displayListener("A",goal)
 // displayListener("C", goal)
