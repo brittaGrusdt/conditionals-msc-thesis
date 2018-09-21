@@ -1,0 +1,248 @@
+// SET PARAMETERS
+/////////////////////////////////////////////
+var granularity = 15
+var threshold = 0.9
+var utterances = ["A", "C", "If A, C", "If C, A",
+"not A", "not C",
+"If A, not C",
+"If not A, C",
+"If not A, not C",
+"If C, not A",
+"If not C, A",
+"If not C, not A"
+]
+
+var alpha = 5 // speaker optimality
+var beta0 = 0 // speaker utility factor probs
+var beta1 = 1 // speaker utility factor bayes nets
+
+// var p = [0.8, 0, 0.2, 0] // A
+// var p = [0, 0.8, 0, 0.2] // not A
+// var p = [0.8, 0.2, 0, 0] // C
+// var p = [0, 0, 0.2, 0.8] // not C
+
+var p = [0.36, 0.59, 0.04, 0.01] // A->C
+// var p = [0.1, 0.2, 0.4, 0.3] // A -> not C
+// var p = [0.15, 0.6, 0.15, 0.1] // not A -> C
+// var p = [0.15, 0.1, 0.15, 0.6] // not A -> not C
+// var p = [0.36, 0.04, 0.59, 0.01] // C->A
+// var p = [0.1, 0.4, 0.2, 0.3] // C -> not A
+// var p = [0.1, 0.1, 0.6, 0.2] //not C -> A
+// var p = [0.1, 0.1, 0.2, 0.6] //not C -> not A
+// var p = [0.25, 0.25, 0.25, 0.25]
+
+// var bn = 'A ind. C'
+var bn = 'A implies C'
+// var bn = 'C implies A'
+
+var goal = 'causalNet'
+// var goal = 'jointP'
+// var goal = 'mix'
+/////////////////////////////////////////////
+
+
+var roundTo3 = cache(function(x){
+  return Math.round(x*1000)/1000
+  }
+)
+var midBins = map(function(x) {roundTo3(x/granularity +
+                                        1/(2*granularity))},
+                  _.range(0,granularity))
+
+var DiscreteBeta = cache(function(a, b, exclude){
+  Infer({model: function(){
+    categorical({
+      vs:remove(exclude, midBins),
+      ps:map(function(x){
+        // var xi = x >= 1 ? 0.99 : x == 0 ? 0.01 : x
+        Math.exp(Beta({a, b}).score(x))
+      }, remove(exclude, midBins))
+    })
+  }})
+})
+var networkPrior = function() {
+  var net = uniformDraw(["A implies C",
+                         "C implies A",
+                         "A ind. C"])
+  return net
+ }
+// marginal probabilities
+var pa = cache(function(x){return x[0]+x[2]})
+var pc = cache(function(x){return x[0]+x[1]})
+var pna = cache(function(x){return x[1]+x[3]})
+var pnc = cache(function(x){return x[2]+x[3]})
+
+
+// meaning function to interpret the utterances
+var meaning = function(utterance, table){
+  utterance == "A" ?
+    pa(table) > threshold :
+
+  utterance == "C" ?
+    pc(table) > threshold :
+
+  utterance == "If A, C" ?
+    table[0] > pa(table) * threshold :
+
+  utterance == "If C, A" ?
+    table[0] > pc(table) * threshold :
+
+  utterance == "not A" ?
+    pna(table) > threshold :
+
+  utterance == "not C" ?
+    pnc(table) > threshold :
+
+  utterance == "If A, not C" ?
+    table[2] > pa(table) * threshold :
+
+  utterance == "If not A, C" ?
+    table[1] > pna(table) * threshold :
+
+  utterance == "If not A, not C" ?
+    table[3] > pna(table) * threshold :
+
+  utterance == "If C, not A" ?
+    table[1] > pc(table) * threshold :
+
+  utterance == "If not C, A" ?
+    table[2] > pnc(table) * threshold :
+
+  utterance == "If not C, not A" ?
+      table[3] > pnc(table) * threshold :
+
+  utterance == "" ?
+    true :
+  -1
+}
+
+var probsPrior = function(network){
+  // [p(a), p(c)] or [p(a), p(c|a), p(c|not a)]
+  var pcond =  sample(DiscreteBeta(1,1,''))
+  var probs = [sample(DiscreteBeta(1,1,'')), pcond]
+
+  if(network == 'A implies C' || network == 'C implies A'){
+    return probs.concat(sample(DiscreteBeta(1,1, pcond)))
+  }else{
+    return probs
+  }
+}
+
+var buildTable = function(probs, bn){
+  if(bn == 'A ind. C'){
+    return [probs[0]*probs[1], (1-probs[0])*probs[1],
+            probs[0]*(1-probs[1]), (1-probs[0])*(1-probs[1])]
+  }else if(bn=='A implies C'){
+    return [probs[0]*probs[1], (1-probs[0])*probs[2],
+            probs[0]*(1-probs[1]), (1-probs[0])*(1-probs[2])]
+  } else if(bn == 'C implies A'){
+    return [probs[0]*probs[1], (1-probs[1]) * probs[0],
+           probs[2]*(1-probs[0]), (1-probs[2])*(1-probs[0])]
+  }else{
+    return -1
+  }
+}
+
+var statePrior = Infer({method:'enumerate', model:function(){
+  var network = networkPrior();
+  var probs = probsPrior(network);
+  var table = buildTable(probs, network)
+  return {'causalNet': network, 'jointP': table}
+ }
+})
+
+var literalListener = cache(function(utterance, llreturn){
+  Infer({method:'enumerate',model: function(){
+           var network = networkPrior()
+           var probs = probsPrior(network)
+           var table = buildTable(probs, network)
+           condition(meaning(utterance, table))
+           if(llreturn == 'causalNet'){return network}
+           else{return table}
+  }})
+})
+
+// PRAGMATIC SPEAKER
+// KL-divergence
+var KL = function(speaker_probability, listener_probability){
+  sum(map(function(cell) {
+    if(speaker_probability[cell] == 0 || listener_probability==0){
+      0
+    }else{
+    speaker_probability[cell] *
+       Math.log(speaker_probability[cell] / listener_probability[cell])
+    }}, _.range(4)))
+}
+
+var speakerBNandP = cache(function(state){
+  return Infer({method:'enumerate',
+                  model: function(){
+                    var utterance = uniformDraw(utterances)
+                    var LLprob = sample(literalListener(utterance, 'jointP'))
+                    var KLdiv = - KL(state['jointP'], LLprob)
+                    var LLbn = literalListener(utterance, 'causalNet')
+                    factor(alpha*(beta0 * (KLdiv) +
+                                  beta1 * LLbn.score(state['causalNet'])))
+                    return utterance
+                }
+               })
+})
+
+var speakerBN = cache(function(state){
+  return Infer({method:'enumerate',
+                  model: function(){
+                   var utterance = uniformDraw(utterances)
+                   var LLbn = literalListener(utterance, 'causalNet')
+                   factor(alpha*LLbn.score(state))
+                   return utterance
+                  }
+                })
+})
+
+var speakerP = cache(function(state){
+  return Infer({method:'enumerate',
+                  model: function(){
+                    var utterance = uniformDraw(utterances)
+                    var LLprob = sample(literalListener(utterance, 'jointP'))
+                    var KLdiv = - KL(state, LLprob)
+                    factor(alpha*KLdiv)
+                    return utterance
+                  }
+                 })
+})
+
+var speaker = cache(function(state, goal) {
+    if(goal=='mix'){
+     if(beta0==0 || beta1==0){
+       error('beta0 and beta1 cannot be 0 for goal: mix')
+     }
+     return speakerBNandP(state)
+    } else if (goal=='causalNet'){
+      return speakerBN(state)
+    } else if (goal=='jointP'){
+      return speakerP(state)
+    }
+})
+
+// DISPLAY PRAGMATIC SPEAKER INFERENCES
+var displaySpeaker = cache(function(state, goal){
+  print('null utterance included:')
+  print(find(function(a){a==''}, utterances)=='')
+  display('speaker optimality is set to ' + alpha)
+  display('speaker: ' + state['jointP'] + ', ' + state['causalNet'])
+  if(goal=='mix'){
+    display('speaker transmits probs (' + beta0 + ')')
+    display('speaker transmits bn (' + beta1 + ')')
+    viz(speaker(state, goal), {xLabel:'utterances'})
+  }else if(goal == 'causalNet'){
+    display('speaker transmits Bayes Network')
+    viz(speaker(state[goal], goal), {xLabel:'utterances'})
+  }else{
+    display('speaker transmits probabilities')
+    viz(speaker(state[goal], goal), {xLabel:'utterances'})
+   }
+})
+
+// PLOTS
+displaySpeaker({'jointP': p, 'causalNet': bn}, goal)
+
