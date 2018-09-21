@@ -136,7 +136,6 @@ var statePrior = Infer({method:'enumerate', model:function(){
   var network = networkPrior();
   var probs = probsPrior(network);
   var table = buildTable(probs, network)
-  condition(pCgivenA(table)>0.7 && pAgivenC(table) > 0.7)
   return {'causalNet': network, 'jointP': table}
  }
 })
