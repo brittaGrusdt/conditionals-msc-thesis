@@ -1,6 +1,6 @@
 // SET PARAMETERS //
 /////////////////////////////////////////////
-var granularity = 10
+var granularity = 20
 var threshold = 0.9
 var utterances = ["A", "C", "If A, C", "If C, A",
 "not A", "not C",
@@ -18,8 +18,8 @@ var beta0 = 0.5 // speaker utility factor probs
 var beta1 = 0.5 // speaker utility factor bayes nets
 
 // var goal='causalNet'
-// var goal = 'jointP'
-var goal = 'mix'
+var goal = 'jointP'
+// var goal = 'mix'
 /////////////////////////////////////////////
 print('granularity is set to: ' + granularity)
 
@@ -46,14 +46,15 @@ var networkPrior = function() {
   var net = categorical({vs:["A implies C",
                              "C implies A",
                              "A ind. C"],
-                        ps:[0.45,0.45,0.1]})
+                        ps:[0.48,0.48,0.04]})
+
   return net
  }
 // marginal probabilities
-var pa = cache(function(x){return x[0]+x[2]})
-var pc = cache(function(x){return x[0]+x[1]})
-var pna = cache(function(x){return x[1]+x[3]})
-var pnc = cache(function(x){return x[2]+x[3]})
+var pa = function(x){return x[0]+x[2]}
+var pc = function(x){return x[0]+x[1]}
+var pna = function(x){return x[1]+x[3]}
+var pnc = function(x){return x[2]+x[3]}
 // conditional probabilities
 var pAgivenC = function(x){return x[0]/pc(x)}
 var pAgivenNC = function(x){return x[2]/pnc(x)}
@@ -63,7 +64,7 @@ var pCgivenA = function(x){return x[0]/pa(x)}
 
 
 // meaning function to interpret the utterances
-var meaning = function(utterance, table){
+var meaning = cache(function(utterance, table){
   utterance == "A" ?
     pa(table) > threshold :
 
@@ -103,7 +104,7 @@ var meaning = function(utterance, table){
   utterance == "" ?
     true :
   -1
-}
+})
 
 var probsPrior = function(network){
   // [p(a), p(c)] or [p(a), p(c|a), p(c|not a)]
@@ -132,12 +133,14 @@ var buildTable = function(probs, bn){
   }
 }
 
-var statePrior = Infer({method:'enumerate', model:function(){
-  var network = networkPrior();
-  var probs = probsPrior(network);
-  var table = buildTable(probs, network)
-  return {'causalNet': network, 'jointP': table}
- }
+var statePrior = cache(function(){
+  return Infer({method:'enumerate', model:function(){
+    var network = networkPrior();
+    var probs = probsPrior(network);
+    var table = buildTable(probs, network)
+    return {'causalNet': network, 'jointP': table}
+  }
+  })
 })
 
 var literalListener = cache(function(utterance, llreturn){
@@ -153,7 +156,7 @@ var literalListener = cache(function(utterance, llreturn){
 
 // PRAGMATIC SPEAKER
 // KL-divergence
-var KL = function(speaker_probability, listener_probability){
+var KL = cache(function(speaker_probability, listener_probability){
   sum(map(function(cell) {
     if(speaker_probability[cell] == 0 || listener_probability==0){
       0
@@ -161,7 +164,7 @@ var KL = function(speaker_probability, listener_probability){
     speaker_probability[cell] *
        Math.log(speaker_probability[cell] / listener_probability[cell])
     }}, _.range(4)))
-}
+})
 
 var speakerBNandP = cache(function(state){
   return Infer({method:'enumerate',
@@ -199,7 +202,6 @@ var speakerP = cache(function(state){
                   }
                  })
 })
-
 var speaker = cache(function(state, goal) {
     if(goal=='mix'){
      if(beta0==0 || beta1==0){
@@ -212,7 +214,6 @@ var speaker = cache(function(state, goal) {
       return speakerP(state)
     }
 })
-
 // PRAGMATIC LISTENER
 var listener = function(utterance, goal){
   if(goal=='mix'){
@@ -226,10 +227,9 @@ var listener = function(utterance, goal){
             })
   }else{
     Infer({method:'MCMC', callbacks: [editor.MCMCProgress()],
-           lag: 6, burn:100, samples:1000,
-  //   Infer({method:'rejection', samples:10000,
-           model: function(){
-      var state = sample(statePrior);
+           lag: 6, burn:100, samples:1000, model:function(){
+//     Infer({method:'enumerate', model: function(){
+      var state = sample(statePrior());
       observe(speaker(state[goal], goal),utterance)
       return state
     }})
@@ -261,11 +261,12 @@ var displayListener = function(utterance, goal){
      {xLabel:'P(C|A)'})
   viz(marginalize(pragListener, function(state){return pAgivenC(state['jointP'])}),
      {xLabel:'P(A|C)'})
-
+  viz(marginalize(pragListener, function(state){return pCgivenNA(state['jointP'])}),
+     {xLabel:'P(C|not A)'})
+  viz(marginalize(pragListener, function(state){return pAgivenNC(state['jointP'])}),
+     {xLabel:'P(A|not C)'})
 }
 
 //PLOTS
 displayListener("If A, C", goal)
-// displayListener("If C, A", goal, visualize)
-// displayListener("A",goal)
-// displayListener("C", goal)
+
