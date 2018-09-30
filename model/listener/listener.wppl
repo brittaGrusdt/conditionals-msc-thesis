@@ -1,6 +1,6 @@
 // SET PARAMETERS //
 /////////////////////////////////////////////
-var granularity = 15
+var granularity = 20
 var threshold = 0.9
 var utterances = ["A", "C", "If A, C", "If C, A",
 "not A", "not C",
@@ -24,15 +24,15 @@ var goal = 'jointP'
 print('granularity is set to: ' + granularity)
 
 //Helpers
-var roundTo3 = cache(function(x){
+var roundTo3 = function(x){
   return Math.round(x*1000)/1000
   }
-)
+
 var midBins = map(function(x) {roundTo3(x/granularity +
                                         1/(2*granularity))},
                   _.range(0,granularity))
 
-var DiscreteBeta = cache(function(a, b, exclude){
+var DiscreteBeta = function(a, b, exclude){
   Infer({model: function(){
     categorical({
       vs:remove(exclude, midBins),
@@ -42,9 +42,9 @@ var DiscreteBeta = cache(function(a, b, exclude){
       }, remove(exclude, midBins))
     })
   }})
-})
+}
 
-var buildTable = cache(function(probs, bn){
+var buildTable = function(probs, bn){
   if(bn == 'A ind. C'){
     return [probs[0]*probs[1], (1-probs[0])*probs[1],
             probs[0]*(1-probs[1]), (1-probs[0])*(1-probs[1])]
@@ -57,20 +57,20 @@ var buildTable = cache(function(probs, bn){
   }else{
     return -1
   }
-})
+}
 
 
 // marginal probabilities
-var pa = cache(function(x){return x[0]+x[2]})
-var pc = cache(function(x){return x[0]+x[1]})
-var pna = cache(function(x){return x[1]+x[3]})
-var pnc = cache(function(x){return x[2]+x[3]})
+var pa = function(x){return x[0]+x[2]}
+var pc = function(x){return x[0]+x[1]}
+var pna = function(x){return x[1]+x[3]}
+var pnc = function(x){return x[2]+x[3]}
 // conditional probabilities
-var pAgivenC = cache(function(x){return x[0]/pc(x)})
-var pAgivenNC = cache(function(x){return x[2]/pnc(x)})
-var pNAgivenC = cache(function(x){return x[1]/pc(x)})
-var pNAgivenNC = cache(function(x){return x[3]/pnc(x)})
-var pCgivenA = cache(function(x){return x[0]/pa(x)})
+var pAgivenC = function(x){return x[0]/pc(x)}
+var pAgivenNC = function(x){return x[2]/pnc(x)}
+var pNAgivenC = function(x){return x[1]/pc(x)}
+var pNAgivenNC = function(x){return x[3]/pnc(x)}
+var pCgivenA = function(x){return x[0]/pa(x)}
 
 
 // meaning function to interpret the utterances
@@ -150,18 +150,16 @@ var statePrior = cache(function(){
 // LITERAL LISTENER
 var literalListener = cache(function(utterance, llreturn){
   Infer({method:'enumerate',model: function(){
-           var network = networkPrior()
-           var probs = probsPrior(network)
-           var table = buildTable(probs, network)
-           condition(meaning(utterance, table))
-           if(llreturn == 'causalNet'){return network}
-           else{return table}
+           var state = sample(statePrior())
+           condition(meaning(utterance, state['jointP']))
+           if(llreturn == 'causalNet'){return state['causalNet']}
+           else{return state['jointP']}
   }})
 })
 
 // PRAGMATIC SPEAKER
 // KL-divergence
-var KL = cache(function(speaker_probability, listener_probability){
+var KL = function(speaker_probability, listener_probability){
   sum(map(function(cell) {
     if(speaker_probability[cell] == 0 || listener_probability==0){
       0
@@ -169,7 +167,7 @@ var KL = cache(function(speaker_probability, listener_probability){
     speaker_probability[cell] *
        Math.log(speaker_probability[cell] / listener_probability[cell])
     }}, _.range(4)))
-})
+}
 
 var speakerBNandP = cache(function(state){
   return Infer({method:'enumerate',
@@ -224,7 +222,7 @@ var listener = function(utterance, goal){
   if(goal=='mix'){
 //   Infer({method:'rejection', samples:10000, model:function(){
       Infer({method:'MCMC', callbacks: [editor.MCMCProgress()],
-             lag: 6, burn:100, samples:1000, model: function(){
+             lag: 1, burn:100, samples:1000, model: function(){
                 var state = sample(statePrior);
                 observe(speaker(state, goal),utterance)
                 return state
@@ -232,7 +230,7 @@ var listener = function(utterance, goal){
             })
   }else{
     Infer({method:'MCMC', callbacks: [editor.MCMCProgress()],
-           lag: 6, burn:100, samples:1000, model:function(){
+           lag: 1, burn:100, samples:1000, model:function(){
 //     Infer({method:'enumerate', model: function(){
       var state = sample(statePrior());
       observe(speaker(state[goal], goal),utterance)
