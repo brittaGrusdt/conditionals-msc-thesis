@@ -7,7 +7,7 @@
 \usepackage{graphicx}
 \usepackage{hyperref}
 \usepackage{svg}
-\graphicspath{{figs-pragmatic-listener-results/conditionalPerfection/}{figs-pragmatic-listener-results/biscuits/}{figs-pragmatic-listener-results/}}
+\graphicspath{{figs-pragmatic-listener-results/conditionalPerfection/}{figs-pragmatic-listener-results/biscuits/}{figs-pragmatic-listener-results/enumerate-25/}{figs-pragmatic-listener-results/mcmcg30-5000/}}
 \usepackage{listings}
 \usepackage{todonotes}
 \usepackage{apacite}
@@ -116,16 +116,33 @@ captionpos=b
 \subsection*{Pragmatic Listener with enumerate}
 \begin{figure}[ht]
 \centering
-\subfloat[$P(C)$]{\label{fig:PL-PAgivenC}\includesvg[width=0.3\textwidth]{figs-pragmatic-listener-results/2018_9_30_6_14_22}}\qquad
-\subfloat[$P(C|A)$]{\label{fig:PL-PCgivenA}\includesvg[]{figs-pragmatic-listener-results/2018_9_30_6_16_16}}\qquad
-\subfloat[$P(A|C)$]{\label{fig:PL-PC}\includesvg[]{figs-pragmatic-listener-results/2018_9_30_6_17_10}}\qquad
-\subfloat[$P(Bayes Net)$]{\label{fig:PL-PC}\includesvg[]{figs-pragmatic-listener-results/2018_9_30_6_14_56}}\qquad
+\subfloat[$P(C)$]{\label{fig:PL-PAgivenC}\includesvg[width=0.3\textwidth]{figs-pragmatic-listener-results/enumerate-25/2018_9_30_6_14_22}}\qquad
+\subfloat[$P(C|A)$]{\label{fig:PL-PCgivenA}\includesvg[]{figs-pragmatic-listener-results/enumerate-25/2018_9_30_6_16_16}}\qquad
+\subfloat[$P(A|C)$]{\label{fig:PL-PC}\includesvg[]{figs-pragmatic-listener-results/enumerate-25/2018_9_30_6_17_10}}\qquad
+\subfloat[$P(Bayes Net)$]{\label{fig:PL-PC}\includesvg[]{figs-pragmatic-listener-results/enumerate-25/2018_9_30_6_14_56}}\qquad
 
 
 \caption{Pragmatic Listener's distributions after hearing \textit{If A, C} with a uniform network prior. Granularity 25 was used.}
 \label{fig:PL}
 \end{figure}
 
+
+\FloatBarrier
+\subsection*{Pragmatic Listener with MCMC}
+\begin{figure}[ht]
+\centering
+\subfloat[$P(C)$]{\label{fig:PL-mcmc-PAgivenC}\includesvg[width=0.3\textwidth]{figs-pragmatic-listener-results/mcmcg30-5000/2018_10_1_6_53_37}}\qquad
+\subfloat[$P(C|A)$]{\label{fig:PL-mcmc-PCgivenA}\includesvg[]{figs-pragmatic-listener-results/mcmcg30-5000/2018_10_1_6_54_19}}\qquad
+
+\subfloat[$P(A|C)$]{\label{fig:PL-mcmc-PC}\includesvg[]{figs-pragmatic-listener-results/mcmcg30-5000/2018_10_1_6_54_40}}\qquad
+\subfloat[$P(C|\neg A)$]{\label{fig:PL-mcmc-PC}\includesvg[]{figs-pragmatic-listener-results/mcmcg30-5000/2018_10_1_6_54_59}}\qquad
+
+\subfloat[$P(Bayes Net)$]{\label{fig:PL-mcmc-bn}\includesvg[]{figs-pragmatic-listener-results/mcmcg30-5000/2018_10_1_6_53_56}}
+
+
+\caption{Pragmatic Listener's distributions after hearing \textit{If A, C} with a uniform network prior. Granularity 30 was used, with 100 burn-in samples and 5000 final MCMC samples (lag 1).}
+\label{fig:PL}
+\end{figure}
 
 \FloatBarrier
 %\subsection*{Qud}
