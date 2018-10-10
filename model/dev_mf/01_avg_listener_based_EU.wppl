@@ -1,0 +1,268 @@
+// SET PARAMETERS //
+/////////////////////////////////////////////
+var granularity = 20
+var threshold = 0.9
+var threshold_probably = 0.6
+var utterances = ["A", "C", 
+                  "not A", "not C",
+//                   "A and C", 
+//                   "A and not C",
+//                   "not A and C",
+//                   "not A and not C",
+//                   "probably A",
+//                   "probably C",
+//                   "probably not A",
+//                   "probably not C",
+                  "If A, C", "If C, A",
+                  "If A, not C",
+                  "If not A, C",
+                  "If not A, not C",
+                  "If C, not A",
+                  "If not C, A",
+                  "If not C, not A"//,
+                  // ""
+                 ]
+
+var alpha = 50 // speaker optimality
+var beta0 = 0.5 // speaker utility factor probs
+var beta1 = 0.5 // speaker utility factor bayes nets
+
+// var goal='causalNet'
+var goal = 'jointP'
+// var goal = 'mix'
+/////////////////////////////////////////////
+display('granularity is set to: ' + granularity)
+
+//Helpers
+var roundTo3 = function(x){
+  return Math.round(x*1000)/1000
+}
+
+var midBins = map(function(x) {roundTo3(x/granularity +
+                                        1/(2*granularity))},
+                  _.range(0,granularity))
+
+var DiscreteBeta = function(a, b, exclude){
+  Infer({model: function(){
+    categorical({
+      vs:remove(exclude, midBins),
+      ps:map(function(x){
+        // var xi = x >= 1 ? 0.99 : x == 0 ? 0.01 : x
+        Math.exp(Beta({a, b}).score(x))
+      }, remove(exclude, midBins))
+    })
+  }})
+}
+
+//PRIORS
+var networkPrior = function() {
+  var net = uniformDraw(["A implies C",
+                         "C implies A",
+//                          "not A implies C",
+//                          "not C implies A", // still need to add also "A impl not C" etc
+                         "A ind. C"])
+  return net
+ }
+
+var probsPrior = function(network){
+  // [p(a), p(c)] or [p(a), p(c|a), p(c|not a)]
+  var pcond =  sample(DiscreteBeta(1,1,''))
+  var probs = network == "A ind. C" ? [sample(DiscreteBeta(1,1,'')), pcond] : 
+      [pcond, sample(DiscreteBeta(10,1,''))] // asymmetrically skewed priors!!
+  if(network != 'A ind. C'){
+    return probs.concat(sample(DiscreteBeta(1,1, pcond)))
+  }else{
+    return probs
+  }
+}
+
+var buildTable = function(probs, bn){
+  if(bn == 'A ind. C'){
+    return [probs[0]*probs[1], (1-probs[0])*probs[1],
+            probs[0]*(1-probs[1]), (1-probs[0])*(1-probs[1])]
+  }else if(bn=='A implies C'){
+    return [probs[0]*probs[1], (1-probs[0])*probs[2],
+            probs[0]*(1-probs[1]), (1-probs[0])*(1-probs[2])]
+  } else if(bn == 'C implies A'){
+    return [probs[0]*probs[1], (1-probs[1]) * probs[0],
+           probs[2]*(1-probs[0]), (1-probs[2])*(1-probs[0])]
+  } 
+  else if(bn == 'not A implies C'){
+    return [(1-probs[0])*probs[2], probs[0]*probs[1],
+            (1-probs[0])*(1-probs[2]), probs[0]*(1-probs[1])]
+  } 
+  else if(bn == 'not C implies A'){
+    return [probs[2]*(1-probs[0]), (1-probs[2])*(1-probs[0]),
+            probs[0]*probs[1], (1-probs[1]) * probs[0]]  
+  } 
+  else{
+    return -1
+  }
+}
+
+var statePrior = cache(function(){
+  return Infer({method:'enumerate', model:function(){
+    var network = networkPrior();
+    var probs = probsPrior(network);
+    var table = buildTable(probs, network)
+    return {'causalNet': network, 'jointP': table}
+  }
+  })
+})
+
+// marginal probabilities
+var pa = function(x){return x[0]+x[2]}
+var pc = function(x){return x[0]+x[1]}
+var pna = function(x){return x[1]+x[3]}
+var pnc = function(x){return x[2]+x[3]}
+// conditional probabilities
+var pAgivenC = function(x){return x[0]/pc(x)}
+var pAgivenNC = function(x){return x[2]/pnc(x)}
+var pNAgivenC = function(x){return x[1]/pc(x)}
+var pNAgivenNC = function(x){return x[3]/pnc(x)}
+var pCgivenA = function(x){return x[0]/pa(x)}
+
+
+// meaning function to interpret the utterances
+var meaning = cache(function(utterance, table){
+  utterance == "A" ?
+    pa(table) > threshold :
+
+  utterance == "C" ?
+    pc(table) > threshold :
+
+  utterance == "not A" ?
+    pna(table) > threshold :
+
+  utterance == "not C" ?
+    pnc(table) > threshold :
+  
+  utterance == "A and C" ?
+    table[0] > threshold :
+  
+  utterance == "A and not C" ?
+    table[2] > threshold :
+
+  utterance == "not A and C" ?
+    table[1] > threshold :
+  
+  utterance == "not A and not C" ?
+    table[3] > threshold :
+ 
+  utterance == "probably A" ?
+    pa(table) > threshold_probably :
+
+  utterance == "probably C" ?
+    pc(table) > threshold_probably :
+
+  utterance == "probably not A" ?
+    pna(table) > threshold_probably :
+
+  utterance == "probably not C" ?
+    pnc(table) > threshold_probably  :
+  
+  utterance == "If A, C" ?
+    table[0] > pa(table) * threshold :
+
+  utterance == "If C, A" ?
+    table[0] > pc(table) * threshold :
+  
+  utterance == "If A, not C" ?
+    table[2] > pa(table) * threshold :
+
+  utterance == "If not A, C" ?
+    table[1] > pna(table) * threshold :
+
+  utterance == "If not A, not C" ?
+    table[3] > pna(table) * threshold :
+
+  utterance == "If C, not A" ?
+    table[1] > pc(table) * threshold :
+
+  utterance == "If not C, A" ?
+    table[2] > pnc(table) * threshold :
+
+  utterance == "If not C, not A" ?
+      table[3] > pnc(table) * threshold :
+
+  utterance == "" ?
+    true :
+  -1
+})
+
+// MODEL
+// LITERAL LISTENER
+var literalListener = cache(function(utterance, llreturn, causalNet){
+  Infer({method:'enumerate',model: function(){
+           var state = sample(statePrior())
+           condition(meaning(utterance, state['jointP']))
+           condition(causalNet == state['causalNet'])
+           if(llreturn == 'causalNet'){return state['causalNet']}
+           else{return state['jointP']}
+  }})
+})
+
+// PRAGMATIC SPEAKER
+// KL-divergence
+var KL = function(speaker_probability, listener_probability){
+  sum(map(function(cell) {
+    if(speaker_probability[cell] == 0 || listener_probability==0){
+      0
+    }else{
+    speaker_probability[cell] *
+       Math.log(speaker_probability[cell] / listener_probability[cell])
+    }}, _.range(4)))
+}
+
+var get_LL_avg = cache(function(utterance, causalNet) {
+  var LL = literalListener(utterance, 'jointP', causalNet)
+  var LL_avg = map(function(cell){ sum(map(function(LLtable) {
+    Math.exp(LL.score(LLtable)) * LLtable[cell]
+  }, 
+                   LL.support()))}, _.range(4))
+  return(LL_avg)
+})
+
+print(get_LL_avg("If A, C", "A implies C"))
+print(get_LL_avg("If A, C", "C implies A"))
+// print(get_LL_avg("A and C", "C implies A"))
+// print(get_LL_avg("A and C", "A implies C"))
+
+var get_EU_avg = function(utterance, causalNet, state) {
+  var LL_avg = get_LL_avg(utterance, causalNet)
+  return(-KL(state, LL_avg))
+}
+
+var speakerMF_avg = cache(function(state, causalNet){
+  return Infer({method:'enumerate',
+                  model: function(){
+                    var utterance = uniformDraw(utterances)
+                    var EU = get_EU_avg(utterance, causalNet, state)
+//                     var LLprob = sample(literalListener(utterance, 'jointP'))
+//                     var KLdiv = - KL(state, LLprob)
+                    factor(alpha*EU)
+                    return utterance
+                  }
+                 })
+})
+
+// // print(literalListener("If A, C", "jointP"))
+
+// var state = sample(literalListener("If A, C", "jointP", "C implies A"))
+// print(state)
+
+// viz(speakerMF_avg(state, "C implies A"))
+
+// PRAGMATIC LISTENER
+var listener = function(utterance){
+  return Infer({method:'rejection',
+                samples:100, model:function(){
+                  var state = sample(statePrior());
+                  observe(speakerMF_avg(state['jointP'], state['causalNet']),utterance)
+                  return { 'jointP': state['jointP'], 'causalNet': state['causalNet']}
+                }})
+}
+
+var pragListener = listener("If A, C", goal)
+viz(marginalize(pragListener, "causalNet"))
+// viz(pragListener)
