@@ -7,7 +7,7 @@
 \usepackage{graphicx}
 \usepackage{hyperref}
 \usepackage{svg}
-\graphicspath{{figs/debugspeaker/}}
+\graphicspath{{figs-causal-inference/}}
 \usepackage{listings}
 \usepackage{todonotes}
 \usepackage{apacite}
@@ -100,7 +100,7 @@ $\boldsymbol{\neg C}$	& 0.003 & 0.332 & 0.335 \\ \hline
 
 \begin{figure}[h]
 \centering
-\subfloat[]{\label{fig:speakerBad-ac}\includesvg[]{figs/debugspeaker/Table4}} 
+\subfloat[]{\label{fig:speakerBad-ac}\includesvg[]{figs-causal-inference/Table4}} 
 \caption{Speaker distribution for Table \ref{table:speakerBad-ac} for state: $[0.048, 0.617, 0.003, 0.332]$. The speaker does not say If A, C although its probability is very high.}
 \end{figure}
 
@@ -155,7 +155,7 @@ $P(\neg C$ &  0.0246 & 0.502
 
 \begin{figure}[htp!]
 \centering
-\subfloat[]{\label{fig:speakerbad-ca}\includesvg[]{figs/debugspeaker/Table1}}
+\subfloat[]{\label{fig:speakerbad-ca}\includesvg[]{figs-causal-inference/Table1}}
 \caption{Speaker distribution for Table \ref{table:speakerBad-ca}. The speaker does not say \textit{If not C, not A} although its probabilit is very high. The speaker table looks very different from the average table of the literal listener (C,not A) that makes the utterance \textit{If not C, not A} true.}
 \end{figure}
 
@@ -188,7 +188,7 @@ $P(\neg C|\neg A)$ & 0.775
 
 \begin{figure}
 \centering
-\subfloat[]{\label{fig:speakerGood-ca}\includesvg[]{figs/debugspeaker/Table2}} 
+\subfloat[]{\label{fig:speakerGood-ca}\includesvg[]{figs-causal-inference/Table2}} 
 \caption{Speaker distribution for Table \ref{table:speakerGood-ca}~. Now the speaker does say \textit{If not C, not A}. This speaker's table looks much more like the average from table \ref{table:mean-pnanc}~.}
 \end{figure}
 
