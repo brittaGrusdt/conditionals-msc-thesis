@@ -1,3 +1,25 @@
+var granularity = 20
+var roundTo3 = cache(function(x){
+  return Math.round(x*1000)/1000
+  }
+)
+
+var midBins = map(function(x){
+                    roundTo3(x/granularity +
+                      1/(2*granularity))
+                  },_.range(0,granularity))
+
+var DiscreteBeta = cache(function(a, b, exclude){
+  Infer({model: function(){
+    categorical({
+      vs:midBins,
+      ps:map(function(x){
+        Math.exp(Beta({a, b}).score(x))
+      }, midBins)
+    })
+  }})
+})
+
 var networkPrior = function() {
   var net = uniformDraw(["A implies C",
                          "C implies A",
@@ -6,17 +28,17 @@ var networkPrior = function() {
  }
 
 var pAIndependentC = function(){
-    var A = beta(1,1)
-    var C = beta(1,1)
+    var A = sample(DiscreteBeta(1,1))
+    var C = sample(DiscreteBeta(1,1))
     var jointP = [A*C    , (1-A)* C,
                   A*(1-C), (1-A)*(1-C)]
     return jointP
 }
 
 var pADependentC = function(){
-    var C = beta(1,1)
-    var A_givenC = beta(1,1)
-    var A_givenNotC = beta(1,1)
+    var C = sample(DiscreteBeta(1,1))
+    var A_givenC = sample(DiscreteBeta(1,1))
+    var A_givenNotC = sample(DiscreteBeta(1,1))
 
     var jointP = [A_givenC*C    , (1-A_givenC)* C,
                   A_givenNotC*(1-C), (1-A_givenNotC)*(1-C)]
@@ -24,9 +46,9 @@ var pADependentC = function(){
 }
 
 var pCDependentA = function(){
-    var A = beta(1,1)
-    var C_givenA = beta(1,1)
-    var C_givenNotA =beta(1,1)
+    var A = sample(DiscreteBeta(1,1))
+    var C_givenA = sample(DiscreteBeta(1,1))
+    var C_givenNotA = sample(DiscreteBeta(1,1))
 
     var jointP = [A*C_givenA    , (1-A)* C_givenNotA,
                   A*(1-C_givenA), (1-A)*(1-C_givenNotA)]
@@ -91,8 +113,7 @@ var meaning = function(utterance, state){
 
 // literal listener
 var literalListener = function(utterance){
-  Infer({method: "MCMC",
-         samples: 100000,
+  Infer({method: "enumerate",
          model: function(){
            var state = statePrior();
            condition(meaning(utterance, state))
@@ -138,7 +159,7 @@ var displayLL = function(utterance, marginalized){
 // DISPLAY LITERAL LISTENER INFERENCES
 var marginal = 'BN'
 // var marginal = 'C|A'
-// displayLL("If A, C", marginal)
+displayLL("If A, C", marginal)
 // displayLL("If C, A", marginal)
 // displayLL("C", marginal)
 // displayLL("A", marginal)
