@@ -86,8 +86,8 @@ In order to get discrete values, we define a discrete version of the Beta distri
 
 \begin{figure}
 \centering
-\subfloat[Granularity value for discrete beta values set to 5.]{\includesvg{figs/speaker-granularity5}} \qquad
-\subfloat[Granularity value for discrete beta values set to 10.]{\includesvg{figs/speaker-granularity10}}
+\subfloat[Granularity value for discrete beta values set to 5.]{\includesvg{figs-base-model/speaker-granularity5}} \qquad
+\subfloat[Granularity value for discrete beta values set to 10.]{\includesvg{figs-base-model/speaker-granularity10}}
 \caption{Speaker distribution over utterances for different granularity values of the discrete beta distribution from which we sample to get the prior joint probability tables of the listener. The pragmatic constant $\alpha$ was set to 5 and the speaker's joint probability table was [0.2, 0.0, 0.8, 0.0] $(P(C,A), P(C,\neg A), P(\neg C, A), P(\neg C, \neg A))$. }
 \label{fig:impactGranularity}
 \end{figure}
@@ -96,22 +96,22 @@ In order to get discrete values, we define a discrete version of the Beta distri
 \section*{Literal Listener}
 
 \begin{figure}[ht]
-\subfloat[LL hears \textit{A}.]{\includesvg{figs/figs-week1/PC_uttA}}\qquad
-\subfloat[LL hears \textit{C}.]{\includesvg{figs/figs-week1/PC_uttC}}\qquad
+\subfloat[LL hears \textit{A}.]{\includesvg{figs-base-model/figs-week1/PC_uttA}}\qquad
+\subfloat[LL hears \textit{C}.]{\includesvg{figs-base-model/figs-week1/PC_uttC}}\qquad
 
-\subfloat[LL hears \textit{If A, C}.]{\includesvg{figs/figs-week1/PC_uttAC}}\qquad 
-\subfloat[LL hears \textit{If C, A}.]{\includesvg{figs/figs-week1/PC_uttCA}}
+\subfloat[LL hears \textit{If A, C}.]{\includesvg{figs-base-model/figs-week1/PC_uttAC}}\qquad 
+\subfloat[LL hears \textit{If C, A}.]{\includesvg{figs-base-model/figs-week1/PC_uttCA}}
 \caption{Distributions $P(C)$ the Literal Listener infers depending on the heard utterances when the threshold of the meaning function is set to 0.9.}
 \label{fig:LL-distributions-P-C}
 \end{figure}
 
 
 \begin{figure}[ht]
-\subfloat[LL hears \textit{A}.]{\includesvg{figs/figs-week1/LL-A-marginal-CgivenA}}\qquad
-\subfloat[LL hears \textit{C}.]{\includesvg{figs/figs-week1/LL-C-marginal-CgivenA}}\qquad
+\subfloat[LL hears \textit{A}.]{\includesvg{figs-base-model/figs-week1/LL-A-marginal-CgivenA}}\qquad
+\subfloat[LL hears \textit{C}.]{\includesvg{figs-base-model/figs-week1/LL-C-marginal-CgivenA}}\qquad
 
-\subfloat[LL hears \textit{If A, C}.]{\includesvg{figs/figs-week1/LL-ifAC-marginal-CgivenA}}\qquad
-\subfloat[LL hears \textit{If C, A}.]{\includesvg{figs/figs-week1/LL-ifCA-marginal-CgivenA}}
+\subfloat[LL hears \textit{If A, C}.]{\includesvg{figs-base-model/figs-week1/LL-ifAC-marginal-CgivenA}}\qquad
+\subfloat[LL hears \textit{If C, A}.]{\includesvg{figs-base-model/figs-week1/LL-ifCA-marginal-CgivenA}}
 \caption{Distributions $P(C|A)$ the Literal Listener infers depending on the heard utterances when the threshold of the meaning function is set to 0.9.}
 \label{fig:LL-distributions-P-CA}
 \end{figure}
@@ -148,7 +148,7 @@ var literalListener = function(utterance, focus){
   \node {Bayes Network}
     child { node[label=below:$P(C|A)\sim \textrm{unif(0,1)}$] {A ind. C}  edge from parent node{$\frac{1}{3}$}}    
     child { node[label=below:$P(C|A)\sim \textrm{unif(0,1)}$] {A implies C}  edge from parent node{$\frac{1}{3}$}}
-    child { node[label=below:{\includesvg[width=0.15\columnwidth]{figs/pdf-cgivena-bn-ca}}] {C implies A}  edge from parent node{$\frac{1}{3}$}};
+    child { node[label=below:{\includesvg[width=0.15\columnwidth]{figs-base-model/pdf-cgivena-bn-ca}}] {C implies A}  edge from parent node{$\frac{1}{3}$}};
 \end{tikzpicture}
 \caption{Distributions of $P(C|A)$ for each Bayes Network.}
 \label{graph:PCAperNet}
@@ -159,11 +159,11 @@ Figure \ref{fig:LL-BN} shows the Literal Listener's distributions over the three
 
 \begin{figure}[ht]
 \centering
-\subfloat[LL hears \textit{A}.]{\includesvg{figs/LL-BayesNet-utt-A}}\qquad
-\subfloat[LL hears \textit{C}.]{\includesvg{figs/LL-BayesNet-utt-C}}
+\subfloat[LL hears \textit{A}.]{\includesvg{figs-base-model/LL-BayesNet-utt-A}}\qquad
+\subfloat[LL hears \textit{C}.]{\includesvg{figs-base-model/LL-BayesNet-utt-C}}
 
-\subfloat[LL hears \textit{If A, then C}.]{\includesvg{figs/LL-BayesNet-utt-A-C}}\qquad
-\subfloat[LL hears \textit{If C, then A}.]{\includesvg{figs/LL-BayesNet-utt-C-A}}
+\subfloat[LL hears \textit{If A, then C}.]{\includesvg{figs-base-model/LL-BayesNet-utt-A-C}}\qquad
+\subfloat[LL hears \textit{If C, then A}.]{\includesvg{figs-base-model/LL-BayesNet-utt-C-A}}
 
 \caption{Literal Listener's distributions over Bayes Networks.}
 \label{fig:LL-BN}
@@ -247,8 +247,8 @@ $P(C|A)$ & 0.2
  
  \begin{figure}[ht]
  \centering
- \subfloat[State probability table was set to the one shown in Table \ref{table:speakerPex1}~.]{\label{fig:speakerExample1}\includesvg{figs/speaker-08-0-02-0}}\qquad
- \subfloat[State probability table was set to the one shown in Table \ref{table:speakerPex2}~. ]{\label{fig:speakerExample2}\includesvg{figs/speaker-02-0-08-0}}
+ \subfloat[State probability table was set to the one shown in Table \ref{table:speakerPex1}~.]{\label{fig:speakerExample1}\includesvg{figs-base-model/speaker-08-0-02-0}}\qquad
+ \subfloat[State probability table was set to the one shown in Table \ref{table:speakerPex2}~. ]{\label{fig:speakerExample2}\includesvg{figs-base-model/speaker-02-0-08-0}}
 \caption{Probability distributions over utterances for the pragmatic speaker given the state probabilites of Table \ref{table:PspeakerA}.}
 \label{fig:speakerExamples12} 
  \end{figure}
@@ -304,8 +304,8 @@ $P(C|\neg A)$ & 0.2\\
 
  \begin{figure}[ht]
  \centering
- \subfloat[State probability table was set to the one shown in Table \ref{table:speakerPex3}~.]{\label{fig:speakerExample3}\includesvg{figs/speaker-08-0-02-0-rightCol}} \qquad
-\subfloat[State probability table was set to the one shown in Table \ref{table:speakerPex4}~.]{\label{fig:speakerExample4}\includesvg{figs/speaker-02-0-08-0-rightCol}} 
+ \subfloat[State probability table was set to the one shown in Table \ref{table:speakerPex3}~.]{\label{fig:speakerExample3}\includesvg{figs-base-model/speaker-08-0-02-0-rightCol}} \qquad
+\subfloat[State probability table was set to the one shown in Table \ref{table:speakerPex4}~.]{\label{fig:speakerExample4}\includesvg{figs-base-model/speaker-02-0-08-0-rightCol}} 
  \caption{Probability distributions over utterances for the pragmatic speaker given the state probabilites of Table \ref{table:PspeakerNotA}~.}
  \label{fig:speakerExamples34}
  \end{figure}
@@ -318,9 +318,9 @@ When these state probabilities are switched, see Table \ref{table:speakerPex4}~,
 \subsubsection*{Version 2: Transferring Causal Networks}
 
 \begin{figure}[htp]
-\subfloat[Bayes Net to transfer: \textit{A implies C}.]{\includesvg{figs/speaker-BN-A-implies-C}}\qquad
-\subfloat[Bayes Net to transfer: \textit{C implies A}.]{\includesvg{figs/speaker-BN-C-implies-A}}\qquad
-\subfloat[Bayes Net to transfer: \textit{A independent C}.]{\includesvg{figs/speaker-BN-A-ind-C}}
+\subfloat[Bayes Net to transfer: \textit{A implies C}.]{\includesvg{figs-base-model/speaker-BN-A-implies-C}}\qquad
+\subfloat[Bayes Net to transfer: \textit{C implies A}.]{\includesvg{figs-base-model/speaker-BN-C-implies-A}}\qquad
+\subfloat[Bayes Net to transfer: \textit{A independent C}.]{\includesvg{figs-base-model/speaker-BN-A-ind-C}}
 \caption{Speaker's probabilites for utterances given that she wants to transmit the underlying causal relations.}
 \label{fig:speaker-bns}
 \end{figure}
@@ -357,22 +357,22 @@ var listener = function(utterance, goal){
 
 \begin{figure}[htp]
 \centering
-\subfloat[Heard utterance: \textit{A}.]{\includesvg{figs/pragmatic-listener/PL-utt-a}}\qquad
-\subfloat[Heard utterance: \textit{C}.]{\includesvg{figs/pragmatic-listener/PL-utt-c}}
+\subfloat[Heard utterance: \textit{A}.]{\includesvg{figs-base-model/pragmatic-listener/PL-utt-a}}\qquad
+\subfloat[Heard utterance: \textit{C}.]{\includesvg{figs-base-model/pragmatic-listener/PL-utt-c}}
 
-\subfloat[Heard utterance: \textit{If A, C}.]{\includesvg{figs/pragmatic-listener/PL-utt-if-a-c}}\qquad
-\subfloat[Heard utterance: \textit{If C, A}.]{\includesvg{figs/pragmatic-listener/PL-utt-if-c-a}}
+\subfloat[Heard utterance: \textit{If A, C}.]{\includesvg{figs-base-model/pragmatic-listener/PL-utt-if-a-c}}\qquad
+\subfloat[Heard utterance: \textit{If C, A}.]{\includesvg{figs-base-model/pragmatic-listener/PL-utt-if-c-a}}
 \caption{Results for the Pragmatic Listener depending on the utterances he has heard given that the Literal Listener is represented as distribution over joint probabilities. Due to the time consumption for the computations, the granularity for the discrete beta distribution was set to 10.}
 \label{fig:pragmaticListenerGivenJointP}
 \end{figure}
 
 \begin{figure}[htp]
 \centering
-\subfloat[Heard utterance: \textit{A}.]{\includesvg{figs/pragmatic-listener/PL-BN-utt-a}}\qquad
-\subfloat[Heard utterance: \textit{C}.]{\includesvg{figs/pragmatic-listener/PL-BN-utt-c}}
+\subfloat[Heard utterance: \textit{A}.]{\includesvg{figs-base-model/pragmatic-listener/PL-BN-utt-a}}\qquad
+\subfloat[Heard utterance: \textit{C}.]{\includesvg{figs-base-model/pragmatic-listener/PL-BN-utt-c}}
 
-\subfloat[Heard utterance: \textit{If A, C}.]{\includesvg{figs/pragmatic-listener/PL-BN-utt-if-a-c}}\qquad
-\subfloat[Heard utterance: \textit{If C, A}.]{\includesvg{figs/pragmatic-listener/PL-BN-utt-if-c-a}}
+\subfloat[Heard utterance: \textit{If A, C}.]{\includesvg{figs-base-model/pragmatic-listener/PL-BN-utt-if-a-c}}\qquad
+\subfloat[Heard utterance: \textit{If C, A}.]{\includesvg{figs-base-model/pragmatic-listener/PL-BN-utt-if-c-a}}
 \caption{Results for the Pragmatic Listener depending on the utterances he has heard given that the Literal Listener is represented as distribution over Bayes Networks.}
 \label{fig:pragmaticListenerGivenBN}
 \end{figure}
