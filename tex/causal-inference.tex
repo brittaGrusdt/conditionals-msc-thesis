@@ -85,8 +85,39 @@ captionpos=b
 }
 
 \begin{document}
+\subsubsection*{Tables from BN A implies C}
+\begin{table}[h]
+\centering
+\begin{tabular}{c|cc|c}
+		   			& \textbf{A} & $\boldsymbol{\neg A}$ & \\\hline
+\textbf{C} 			& 0.048 & 0.617 & 0.665 \\
+$\boldsymbol{\neg C}$	& 0.003 & 0.332 & 0.335 \\ \hline
+					& 0.051 & 0.949 & 1
+\end{tabular}
+\caption{}
+\label{table:speakerBad-ac}
+\end{table}
 
-\section*{Debug Speaker}
+\begin{figure}[h]
+\centering
+\subfloat[]{\label{fig:speakerBad-ac}\includesvg[]{figs/debugspeaker/Table4}} 
+\caption{Speaker distribution for Table \ref{table:speakerBad-ac} for state: $[0.048, 0.617, 0.003, 0.332]$. The speaker does not say If A, C although its probability is very high.}
+\end{figure}
+
+\begin{table}[h]
+\centering
+\begin{tabular}{c|c|c} 
+           & $P(A)$ & $P(C)$ \\ \hline 
+$P(C)$     &  0.502 & 0.278 \\ 
+$P(\neg C$ &  0.0247 & 0.195
+\end{tabular}
+\caption{mean all tables (granularity 30) with $P(C|A)>=0.9$}
+\end{table}
+
+
+\FloatBarrier
+\newpage
+\subsection*{Tables from BN C implies A}
 \begin{table}[h]
 \begin{tabular}{c|cc|c}
 		   			& \textbf{A} & $\boldsymbol{\neg A}$ & \\\hline
@@ -107,7 +138,7 @@ $P(\neg C|A)$ & 0.001\\
 $P(\neg C|\neg A)$ & 0.099
 \end{tabular}
 \caption{Table}
-\label{table:speakerBad}
+\label{table:speakerBad-ca}
 \end{table}
 \vspace{1cm}
 
@@ -119,18 +150,19 @@ $P(C)$     &  0.195 & 0.278 \\
 $P(\neg C$ &  0.0246 & 0.502
 \end{tabular}
 \caption{mean all tables (granularity 30) with $P(\neg A|\neg C)>=0.9$}
+\label{table:mean-pnanc}
 \end{table}
 
 \begin{figure}[htp!]
 \centering
-\subfloat[]{\label{fig:speakerbad}\includesvg[]{figs/debugspeaker/Table1}}
-\caption{Speaker distribution for Table \ref{table:speakerBad}}
+\subfloat[]{\label{fig:speakerbad-ca}\includesvg[]{figs/debugspeaker/Table1}}
+\caption{Speaker distribution for Table \ref{table:speakerBad-ca}. The speaker does not say \textit{If not C, not A} although its probabilit is very high. The speaker table looks very different from the average table of the literal listener (C,not A) that makes the utterance \textit{If not C, not A} true.}
 \end{figure}
 
 \FloatBarrier
 \newpage
 
-\begin{table}
+\begin{table}[h]
 \begin{tabular}{c|cc|c}
 		   			& \textbf{A} & $\boldsymbol{\neg A}$ & \\\hline
 \textbf{C} 			& 0.274 & 0.159 & 0.433 \\
@@ -150,15 +182,14 @@ $P(\neg C|A)$ & 0.065\\
 $P(\neg C|\neg A)$ & 0.775
 \end{tabular}
 \caption{Table}
-\label{table:speakerGood}
+\label{table:speakerGood-ca}
 \end{table}
 
 
 \begin{figure}
 \centering
-\subfloat[]{\label{fig:speakergood}\includesvg[]{figs/debugspeaker/Table2}} 
-\caption{Speaker distribution for Table \ref{table:speakerGood}}
+\subfloat[]{\label{fig:speakerGood-ca}\includesvg[]{figs/debugspeaker/Table2}} 
+\caption{Speaker distribution for Table \ref{table:speakerGood-ca}~. Now the speaker does say \textit{If not C, not A}. This speaker's table looks much more like the average from table \ref{table:mean-pnanc}~.}
 \end{figure}
-
 
 \end{document}
