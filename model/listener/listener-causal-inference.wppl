@@ -1,16 +1,20 @@
 // SET PARAMETERS //
 var speakerOptimality = 5
 var threshold = 0.9
+var threshold_likely = 0.6
 
-var nsamples = 1500
+var nsamples = 3000
 
 var nTables = 7000
-var granularity = 30
+var granularity = 20
 
 var utterances = ["A", "C", "If A, C", "If C, A", "not A", "not C", "If A, not C",
                   "If not A, C", "If not A, not C", "If C, not A", "If not C, A",
-                  "If not C, not A"]
-// "Either both or none", ""]
+                  "If not C, not A",
+                  "A and C", "A exor C",
+                  "likely A", "likely C"]
+//                   "Either both or none", "neither A nor C"]
+
 display('granularity is set to: ' + granularity)
 display('nb tables foreach Bayes Net: ' + nTables)
 display('speaker optimality is set to ' + speakerOptimality)
@@ -48,28 +52,28 @@ var DiscreteUniformTuples = mem(function(n) {
 // samples: [p(a), p(c|a), p(c|not a)]
 var DiscreteBetaTriplesAC = mem(function(n) {
   Infer({method:'forward', samples: n, model:function(){
-    var pcgivena =  beta({a:0.5, b: 0.5})
+    var pcgivena =  beta({a:10, b: 1})
     return [uniform({a:0, b: 1}), pcgivena, beta({a:1, b: 1})]
     }})
 })
 
 var DiscreteBetaTriplesCA = mem(function(n) {
   Infer({method:'forward', samples: n, model:function(){
-    var pagivenc =  beta({a:0.5, b: 0.5})
+    var pagivenc =  beta({a:10, b: 1})
     return [uniform({a:0, b: 1}), pagivenc, beta({a:1, b: 1})]
     }})
 })
 
 var DiscreteBetaTriplesNAC = mem(function(n) {
   Infer({method:'forward', samples: n, model:function(){
-    var pcgivenNa =  beta({a:0.5, b: 0.5})
+    var pcgivenNa =  beta({a:10, b: 1})
     return [uniform({a:0, b: 1}), pcgivenNa, beta({a:1, b: 1})]
     }})
 })
 
 var DiscreteBetaTriplesNCA = mem(function(n) {
   Infer({method:'forward', samples: n, model:function(){
-    var pagivenNc =  beta({a:0.5, b: 0.5})
+    var pagivenNc =  beta({a:10, b: 1})
     return [uniform({a:0, b: 1}), pagivenNc, beta({a:1, b: 1})]
     }})
 })
@@ -94,7 +98,8 @@ var buildTable = function(probs, bn){
   else if (bn=='not C implies A'){
     return [(1-probs[0])*probs[2], (1-probs[2]) * (1-probs[0]),
            probs[1]*probs[0], (1-probs[1])*probs[0]]        
-   }else{
+   }
+  else{
     error("probability table cannot be build for bn " + bn)
   }
 }
@@ -112,43 +117,58 @@ var pCgivenA = function(x){return x[0]/pa(x)}
 
 var meaning = cache(function(utterance, table){
   utterance == "A" ?
-    pa(table) > threshold :
+    pa(table) >= threshold :
 
   utterance == "C" ?
-    pc(table) > threshold :
+    pc(table) >= threshold :
 
   utterance == "If A, C" ?
-    table[0] > pa(table) * threshold :
+    table[0] >= pa(table) * threshold :
 
   utterance == "If C, A" ?
-    table[0] > pc(table) * threshold :
+    table[0] >= pc(table) * threshold :
 
   utterance == "not A" ?
-    pna(table) > threshold :
+    pna(table) >= threshold :
 
   utterance == "not C" ?
-    pnc(table) > threshold :
+    pnc(table) >= threshold :
 
   utterance == "If A, not C" ?
-    table[2] > pa(table) * threshold :
+    table[2] >= pa(table) * threshold :
 
   utterance == "If not A, C" ?
-    table[1] > pna(table) * threshold :
+    table[1] >= pna(table) * threshold :
 
   utterance == "If not A, not C" ?
-    table[3] > pna(table) * threshold :
+    table[3] >= pna(table) * threshold :
 
   utterance == "If C, not A" ?
-    table[1] > pc(table) * threshold :
+    table[1] >= pc(table) * threshold :
 
   utterance == "If not C, A" ?
-    table[2] > pnc(table) * threshold :
+    table[2] >= pnc(table) * threshold :
 
   utterance == "If not C, not A" ?
-      table[3] > pnc(table) * threshold :
+      table[3] >= pnc(table) * threshold :
 
   utterance == "Either both or none" ?
-    table[0]+table[3] > threshold :
+    table[0]+table[3] >= threshold :
+  
+  utterance == "likely A" ? 
+    table[0] + table[2] >= threshold_likely :
+  
+  utterance == "likely C" ?
+    table[0] + table[1] >= threshold_likely : 
+  
+  utterance == "A exor C" ?
+    table[1] + table[2] >= threshold :
+  
+  utterance == "A and C" ?
+    table[0] >= threshold :
+  
+  utterance == "neither A nor C" ?
+    table[3] >= threshold :
   
   utterance == "" ?
     true :
@@ -160,8 +180,8 @@ var networkPrior = function() {
   var net = uniformDraw(["A implies C",
                          "C implies A",
                          "A ind. C"])
-//                          "not A implies C", 
-//                          "not C implies A"])
+			//"not A implies C",
+			//"not C implies A"])
   return net
  }
 
@@ -183,17 +203,18 @@ var probsPriorNtables = function(network){
 var probsPrior = function(network){
   // [p(a), p(c)] or [p(a), p(c|a), p(c|not a)]
   if(network != 'A ind. C'){
-    var pcond =  sample(DiscreteBeta(.5,.5,''))
+//     var pcond =  sample(DiscreteBeta(10, 1,''))
+var pcond = sample(DiscreteBeta(0.5,0.5,''))
     return [sample(DiscreteBeta(1,1,'')), pcond, sample(DiscreteBeta(1,1,pcond))]
-  } else{
+  }else{
      return [sample(DiscreteBeta(1,1,'')), sample(DiscreteBeta(1,1,''))]
   }
 }
 var statePrior = cache(function(){
   return Infer({method:'enumerate', model:function(){
     var network = networkPrior();
-    var probs = probsPrior(network);
-//     var probs = probsPriorNtables(network)
+     var probs = probsPrior(network);
+//    var probs = probsPriorNtables(network)
     var table = buildTable(probs, network)
     return {'BN': network, 'jointP': table}
   }
@@ -256,15 +277,15 @@ var listener = function(utterance, speakerGoals){
 //     Infer({method:'MCMC', samples:nsamples, lag:1, burn:100,
 //            callbacks: [editor.MCMCProgress()], model: function(){
 //     Infer({method:'enumerate', model: function(){
-  return Infer({method:'rejection',samples:nsamples, model:function(){
 //   return Infer({method:'MCMC', samples:nsamples, lag:1, burn:100,
 //                 callbacks: [editor.MCMCProgress()], 
 //                   kernel: { HMC: { stepSize: 0.1, steps: 10 } }, model:function(){  
-  var state = sample(statePrior());
-    observe(speaker(state,speakerGoals),utterance)
-    return state
-  }})
-}
+  return Infer({method:'rejection',samples:nsamples, model:function(){
+  	var state = sample(statePrior());
+    	observe(speaker(state,speakerGoals),utterance)
+    	return state
+	}
+})}
 
 var displayLL = function(utterance, query, causalNet){
   display('Literal Listener hears: ' + utterance)
@@ -313,18 +334,18 @@ var query = 'jointP'
 // var p = [0.677, 0.29, 0.001, 0.032]
 // var p = [0.274, 0.159, 0.019, 0.548]
 // var p = [0.246, 0.321, 0.014, 0.419]
-var p = [0.048, 0.617, 0.003, 0.332]
-display('Pragmatic speakers table: ' + p)
-viz(speaker({'BN':bn, 'jointP': p}, speakerGoals))
+// var p = [0.048, 0.617, 0.003, 0.332]
+// display('Pragmatic speakers table: ' + p)
+// viz(speaker({'BN':bn, 'jointP': p}, speakerGoals))
 
 // displayS(utterance, bn, speakerGoals)
 
 // Pragmatic Listener
-// display('Pragmatic Listener hears: ' + utterance)
-// display('speaker transmits probs: ' + speakerGoals.p)
-// display('speaker transmits bn: ' + speakerGoals.bn)
+display('Pragmatic Listener hears: ' + utterance)
+display('speaker transmits probs: ' + speakerGoals.p)
+display('speaker transmits bn: ' + speakerGoals.bn)
   
-// var pragListener = listener(utterance, speakerGoals)
-// print('nb distinct samples: ' + Object.keys(pragListener.getDist()).length)
-// displayPL(pragListener)
+var pragListener = listener(utterance, speakerGoals)
+print('nb distinct samples: ' + Object.keys(pragListener.getDist()).length)
+displayPL(pragListener)
 
