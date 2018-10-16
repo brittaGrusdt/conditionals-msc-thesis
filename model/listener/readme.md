@@ -23,3 +23,7 @@
 
 * Interpretation of the utterance 'If A, C' as *Conditional Perfection*, i.e. the listener interprets it as biconditional. So P(C|A) ~ P(A|C)
   - Prior: very low on independent Bayes net and equally high on both conditional Bayes Nets
+
+
+#### results-listener-evs.pdf
+* Were done with granularity 25 and 1500 rejection sampling samples
