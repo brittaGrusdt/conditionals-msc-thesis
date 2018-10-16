@@ -7,3 +7,5 @@
 *.pdf_tex
 **/figs/**/*.pdf
 **/__pycache__
+.Rproj.user
+*.Rproj
