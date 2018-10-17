@@ -1,0 +1,364 @@
+// SET PARAMETERS //
+var speakerOptimality = 5
+var threshold = 0.9
+var threshold_likely = 0.5
+
+var nsamples = 1000
+var granularity = 20
+
+var utterances = ["A", "C", "If A, C", "If C, A", "not A", "not C", "If A, not C",
+                  "If not A, C", "If not A, not C", "If C, not A", "If not C, A",
+                  "If not C, not A",
+                  "A and C", "A exor C",
+                  "likely A", "likely C",
+                  "Either both or none", "neither A nor C"]
+
+display('granularity is set to: ' + granularity)
+display('speaker optimality is set to ' + speakerOptimality)
+display("# samples for pragmatic listener: " + nsamples)
+display('----------------------------------------')
+/////////////////////////////////////////////
+var roundTo3 = function(x){
+  return Math.round(x*1000)/1000
+  }
+
+// for using predefined probability values from "Discrete beta"
+var midBins = map(function(x) {roundTo3(x/granularity +
+                                        1/(2*granularity))},
+                  _.range(0,granularity))
+
+var DiscreteBeta = cache(function(a, b, exclude){
+  Infer({model: function(){
+    categorical({
+      vs:remove(exclude, midBins),
+      ps:map(function(x){
+        Math.exp(Beta({a, b}).score(x))
+      }, remove(exclude, midBins))
+    })
+  }})
+})
+
+var buildTable = function(probs, bn){
+  if(bn == 'A ind. C'){
+    return [probs[0]*probs[1], (1-probs[0])*probs[1],
+            probs[0]*(1-probs[1]), (1-probs[0])*(1-probs[1])]
+   }
+  else if(bn=='A implies C'){
+    return [probs[0]*probs[1], (1-probs[0])*probs[2],
+            probs[0]*(1-probs[1]), (1-probs[0])*(1-probs[2])]
+   }
+  else if(bn == 'C implies A'){
+    return [probs[0]*probs[1], (1-probs[1]) * probs[0],
+           probs[2]*(1-probs[0]), (1-probs[2])*(1-probs[0])]
+   }
+  else if(bn=='not A implies C'){
+     return [(1-probs[0])*probs[2], probs[1] * probs[0],
+           (1-probs[0])*(1-probs[2]), (1-probs[1])*probs[0]]
+   }
+  else if (bn=='not C implies A'){
+    return [(1-probs[0])*probs[2], (1-probs[2]) * (1-probs[0]),
+           probs[1]*probs[0], (1-probs[1])*probs[0]]
+   }
+  else{
+    error("probability table cannot be build for bn " + bn)
+  }
+}
+// marginal probabilities
+var pa = function(x){return x[0]+x[2]}
+var pc = function(x){return x[0]+x[1]}
+var pna = function(x){return x[1]+x[3]}
+var pnc = function(x){return x[2]+x[3]}
+// conditional probabilities
+var pAgivenC = function(x){return x[0]/pc(x)}
+var pAgivenNC = function(x){return x[2]/pnc(x)}
+var pNAgivenC = function(x){return x[1]/pc(x)}
+var pNAgivenNC = function(x){return x[3]/pnc(x)}
+var pCgivenA = function(x){return x[0]/pa(x)}
+var pCgivenNA = function(x){return x[1]/pna(x)}
+
+var meaning = cache(function(utterance, table){
+  utterance == "A" ?
+    pa(table) >= threshold :
+
+  utterance == "C" ?
+    pc(table) >= threshold :
+
+  utterance == "If A, C" ?
+    table[0] >= pa(table) * threshold :
+
+  utterance == "If C, A" ?
+    table[0] >= pc(table) * threshold :
+
+  utterance == "not A" ?
+    pna(table) >= threshold :
+
+  utterance == "not C" ?
+    pnc(table) >= threshold :
+
+  utterance == "If A, not C" ?
+    table[2] >= pa(table) * threshold :
+
+  utterance == "If not A, C" ?
+    table[1] >= pna(table) * threshold :
+
+  utterance == "If not A, not C" ?
+    table[3] >= pna(table) * threshold :
+
+  utterance == "If C, not A" ?
+    table[1] >= pc(table) * threshold :
+
+  utterance == "If not C, A" ?
+    table[2] >= pnc(table) * threshold :
+
+  utterance == "If not C, not A" ?
+      table[3] >= pnc(table) * threshold :
+
+  utterance == "Either both or none" ?
+    table[0]+table[3] >= threshold :
+
+  utterance == "likely A" ?
+    table[0] + table[2] > threshold_likely :
+
+  utterance == "likely C" ?
+    table[0] + table[1] > threshold_likely :
+
+  utterance == "A exor C" ?
+    table[1] + table[2] >= threshold :
+
+  utterance == "A and C" ?
+    table[0] >= threshold :
+
+  utterance == "neither A nor C" ?
+    table[3] >= threshold :
+
+  utterance == "" ?
+    true :
+  -1
+})
+
+//PRIORS
+var qudPrior = function(){
+  var qud = uniformDraw(["C", "A"])
+  return qud
+}
+var networkPrior = function() {
+  var net = uniformDraw(["A implies C",
+                         "C implies A",
+                         "A ind. C"])
+     //"not A implies C",
+     //"not C implies A"])
+  return net
+}
+// var networkPrior = function() {
+//   var net = categorical({vs: ["A implies C",
+//                               "C implies A",
+//                               "A ind. C"],
+//      ps: [0.01,0.01,0.98]})
+//   return net
+// }
+// var networkPrior = function() {
+//   var net = categorical({vs: ["A implies C",
+//                               "C implies A",
+//                               "A ind. C"],
+//       ps: [0.499,0.499,0.002]})
+//   return net
+// }
+//
+
+var probsPrior = function(network){
+  // [p(a), p(c)] or [p(a), p(c|a), p(c|not a)]
+  if(network != 'A ind. C'){
+   var pcond =  sample(DiscreteBeta(10, 1,''))
+//     var pcond = sample(DiscreteBeta(0.5,0.5,''))
+//     var pcond =  sample(DiscreteBeta(1, 1,''))
+    return [sample(DiscreteBeta(1,1,'')), pcond, sample(DiscreteBeta(1,1,pcond))]
+  }else{
+     return [sample(DiscreteBeta(1,1,'')), sample(DiscreteBeta(1,1,''))]
+  }
+}
+var statePrior = cache(function(){
+  return Infer({method:'enumerate', model:function(){
+    var network = networkPrior();
+     var probs = probsPrior(network);
+    var table = buildTable(probs, network)
+    return {'BN': network, 'jointP': table}
+  }
+  })
+})
+
+// MODEL
+var literalListener = cache(function(utterance, query, causalNet){
+  Infer({method:'enumerate',model: function(){
+    var state = sample(statePrior())
+    condition(meaning(utterance, state['jointP']))
+    condition(state['BN']==causalNet)
+    if(query == 'BN'){return state['BN']}
+    else{return state['jointP']}
+  }})
+})
+// viz(literalListener('If A, C', 'BN', ''))
+var KL = function(speaker_probability_input, listener_probability_input){
+  var speaker_probability = _.isArray(speaker_probability_input) ?
+     speaker_probability_input :
+     [speaker_probability_input, 1 - speaker_probability_input]
+  var listener_probability = _.isArray(listener_probability_input) ?
+     listener_probability_input :
+     [listener_probability_input, 1 - listener_probability_input]
+  sum(map(function(cell) {
+    if(speaker_probability[cell] == 0 || listener_probability[cell]==0){
+      0
+    }else{
+    speaker_probability[cell] *
+       Math.log(speaker_probability[cell] / listener_probability[cell])
+    }}, _.range(speaker_probability.length)))
+}
+
+var get_LL_avg = cache(function(utterance, causalNet) {
+  var LL = literalListener(utterance, 'jointP', causalNet)
+  var LL_avg = map(function(cell){ sum(map(function(LLtable) {
+    Math.exp(LL.score(LLtable)) * LLtable[cell]
+  },
+                   LL.support()))}, _.range(4))
+  return(LL_avg)
+})
+
+var get_EU_avg = function(utterance, state, causalNet, qud) {
+  var LL_avg = get_LL_avg(utterance, causalNet)
+  // v1. KL between entire tables of LL_avg and speaker
+//   var utility = -KL(state, LL_avg)
+
+// v2. add KL between speaker + LL_avg probabilites of BN the speaker wants
+//     to transmit, if BN is not specified direction is not important and
+//     probabilities of both are used
+//   var utility =  causalNet == "A implies C" ?
+//       -KL(pCgivenA(state), pCgivenA(LL_avg)) :
+//   causalNet == "C implies A" ?
+//       -KL(pAgivenC(state), pAgivenC(LL_avg)) :
+//   causalNet == "A ind. C" ? - KL(state, LL_avg) : error("xy")
+//   -KL(pCgivenA(state), pCgivenA(LL_avg)) - KL(pAgivenC(state), pAgivenC(LL_avg))
+
+// v3. add log probabilities of speaker instead of KL as in v2
+//   var utility =  speakerGoals.causalNet == "A implies C" ?
+//       Math.log(pCgivenA(state)) : speakerGoals.causalNet == "C implies A" ?
+//       Math.log(pAgivenC(state)) : speakerGoals.causalNet == "A ind. C" ? 0 :
+//   Math.log(pCgivenA(state)) + Math.log(pAgivenC(state))
+
+
+ var utility = qud == "A" ? -KL(pa(state), pa(LL_avg)) :
+ qud == "C" ? -KL(pc(state), pc(LL_avg)) : -KL(state, LL_avg)
+//   speakerGoals.qud == "If A, C" ? -KL(pCgivenA(state), pCgivenA(LL_avg)) :
+//   speakerGoals.qud == "If C, A" ? -KL(pAgivenC(state), pAgivenC(LL_avg)) :
+
+
+  return utility
+
+}
+
+var speaker = cache(function(state, qud){
+  return Infer({method:'enumerate', model: function(){
+    var utterance = uniformDraw(utterances)
+    var utility = get_EU_avg(utterance, state['jointP'], state['BN'], qud)
+    factor(speakerOptimality*utility)
+    return utterance
+  }
+ })
+})
+
+// viz(speaker({'jointP':[0.1,0.2,0.3,0.4], 'BN': '', 'a': 0.8, 'c':0.2}))
+var listener = function(utterance){
+  return Infer({method:'rejection',samples:nsamples, model:function(){
+    var state = sample(statePrior());
+    var qud = qudPrior()
+    observe(speaker(state, qud),utterance)
+
+    //     var speakerDist = speaker(state, qud, speakerGoals)
+    //     factor(speakerDist.score(utterance))
+    return {'BN': state['BN'], 'jointP': state['jointP'], 'qud': qud}
+  }
+})}
+
+var displayLL = function(utterance, query, causalNet){
+  display('Literal Listener hears: ' + utterance)
+  if(query=='jointP'){
+    var LL = literalListener(utterance, "jointP", causalNet)
+    viz(marginalize(LL, function(x){return {pC: x[0]+x[1]}}))
+    viz(marginalize(LL, function(x){return {pCgivenA: x[0]/(x[0]+x[2])}}))
+    viz(marginalize(LL, function(x){return {pA: x[0]+x[2]}}))
+    viz(marginalize(LL, function(x){return {pAgivenC: x[0]/(x[0]+x[1])}}))
+    viz(marginalize(LL, function(x){return {pac: x[0]}}))
+    viz(marginalize(LL, function(x){return {pnac: x[1]}}))
+    viz(marginalize(LL, function(x){return {panc: x[2]}}))
+    viz(marginalize(LL, function(x){return {pnanc: x[3]}}))
+  }else{
+    var LL = literalListener(utterance, 'BN', causalNet)
+    viz(LL)
+  }
+}
+
+var displayS = function(utterance, causalNet){
+  display('LL_avg for utterance: ' + utterance + ': and BN ' + causalNet)
+  display(get_LL_avg(utterance, causalNet))
+  var LLp = sample(literalListener(utterance, "jointP", causalNet))
+//   var LLp = [0.048, 0.617, 0.003, 0.332]
+  display('speaker p: ' + LLp)
+  viz(speaker({BN:causalNet, jointP:LLp}, "C"))
+}
+
+var displayPL = function(pragListener){
+  viz(marginalize(pragListener, function(state){return {BN: state['BN']}}))
+//   viz(marginalize(pragListener, function(state){return {pC: pc(state['jointP'])}}))
+//   viz(marginalize(pragListener, function(state){return {pA: pa(state['jointP'])}}))
+//   viz(marginalize(pragListener, function(state){
+//     return {pCgivenA: pCgivenA(state['jointP'])}}))
+//   viz(marginalize(pragListener, function(state){
+//     return {pAgivenC: pAgivenC(state['jointP'])}}))
+  viz(marginalize(pragListener, function(state){return {qud: state['qud']}}))
+}
+
+var getMeans = function(listener, probFunc){
+  var listener_avg = sum(map(function(LLtable) {
+    Math.exp(listener.score(LLtable)) * probFunc(LLtable)
+  }, listener.support()))
+  return listener_avg
+}
+
+var evs = function(pragListener){
+  return {'C|A': getMeans(pragListener, pCgivenA),
+          'A|C': getMeans(pragListener, pAgivenC),
+          'C|-A': getMeans(pragListener, pCgivenNA),
+          'A|-C': getMeans(pragListener, pAgivenNC),
+          'A': getMeans(pragListener, pa),
+          'C': getMeans(pragListener, pc)}
+}
+//PLOTS
+var utterance = "If A, C"
+
+var bn = "A implies C"
+var query = 'jointP'
+// Literal listener
+//displayLL(utterance, "BN", bn)
+
+// Pragmatic speaker
+// var p = [0.677, 0.29, 0.001, 0.032]
+// var p = [0.274, 0.159, 0.019, 0.548]
+// var p = [0.246, 0.321, 0.014, 0.419]
+// var p = [0.048, 0.617, 0.003, 0.332]
+// display('Pragmatic speakers table: ' + p)
+// viz(speaker({'BN':bn, 'jointP': p}, speakerGoals))
+
+// displayS(utterance, bn, speakerGoals)
+
+// Pragmatic Listener
+// display('Pragmatic Listener hears: ' + utterance)
+
+var pragListener = listener(utterance)
+display('nb distinct samples: ' + Object.keys(pragListener.getDist()).length)
+var listenerProbs = marginalize(pragListener,
+                                function(state){return state['jointP']})
+print(evs(listenerProbs))
+displayPL(pragListener)
+// pragListener
+
+// print(get_LL_avg('If A, C', 'A ind. C'))
+
+
