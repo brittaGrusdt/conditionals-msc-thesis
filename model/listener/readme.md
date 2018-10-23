@@ -25,7 +25,7 @@
   - Prior: very low on independent Bayes net and equally high on both conditional Bayes Nets
 
 #### Files in results
-speaker optimality parameter set to 5
+* speaker optimality if not stated set to 5.
 * **results-listener-evs.pdf**
   - from code: listener-networkPriors-biscuits-cp.wppl
   - granularity 25
