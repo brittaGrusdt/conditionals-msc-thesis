@@ -24,6 +24,16 @@
 * Interpretation of the utterance 'If A, C' as *Conditional Perfection*, i.e. the listener interprets it as biconditional. So P(C|A) ~ P(A|C)
   - Prior: very low on independent Bayes net and equally high on both conditional Bayes Nets
 
-
-#### results-listener-evs.pdf
-* Were done with granularity 25 and 1500 rejection sampling samples
+#### Files in results
+speaker optimality parameter set to 5
+* **results-listener-evs.pdf**
+  - from code: listener-networkPriors-biscuits-cp.wppl
+  - granularity 25
+  - 1500 rejection sampling samples.
+  - sampling from beta(10,1) for table priors.
+* **hypotheses.png**
+  -from code: listener-with-hypotheses.wppl
+  - 1500 rejection sampling samples
+  - the literal listener was not conditioned on the causal network, but the results
+    were very similar in both cases, only biscuits were slightly different for P(A|C) (0.58 unconditioned, 0.50 conditioned) and for P(A) (0.54 unconditioned, 0.47 conditioned).
+  - using Hellinger distance instead of KL-divergence did not change much either
