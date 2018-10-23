@@ -9,8 +9,7 @@ posterior <- function(model_path){
   return(listener)
 }
 
-run <- function(model_path, listenerType, inferType){
-  listener <- posterior(model_path)
+eval <- function(listener, listenerType, inferType){
   if(inferType == "samples"){
     df <- buildDF_from_samples(listener)
     ps <- rep(1/length(df$jointP), length(df$jointP))
@@ -24,11 +23,19 @@ run <- function(model_path, listenerType, inferType){
 }
 ########################
 baseDir <- "/home/britta/UNI/Masterarbeit/conditionals/model/listener/"
-model_path <- paste(baseDir, "listener-networkPriors-biscuits-cp.wppl", sep="")
+#model_path <- paste(baseDir, "listener-networkPriors-biscuits-cp.wppl", sep="")
+# model_path <- paste(baseDir, "hpotheses-approach-ll-Not-conditioned-on-cn.wppl", sep="")
+model_path <- paste(baseDir, "hypotheses-approach-ll-conditioned-on-cn.wppl", sep="")
 
 listenerType <- "simple"
-result <- run(model_path, listenerType, "samples")
+listenerType <- "biscuits"
+listenerType <- "perfection"
+listener <- posterior(model_path)
+df <- buildDF_from_samples(listener)
+result <- eval(listener, listenerType, "samples")
 
 #####################
 grid.newpage()
 grid.table(t(result))
+
+# result <- rbind(simple,biscuits, perfection)

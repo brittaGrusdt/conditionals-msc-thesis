@@ -6,7 +6,7 @@ buildDF_from_samples <- function(listener){
   df <- data.frame(matrix(ncol = 2, nrow = length(listener$Parameter=='jointP')))
   colnames(df) <- c("jointP", "BN")
   df$jointP = listener$value[listener$Parameter=='jointP']
-  df$causalNet = listener$value[listener$Parameter=='BN']
+  df$causalNet = listener$value[listener$Parameter=='cn']
   return(df)
 }
 
@@ -34,6 +34,7 @@ computeProbs <- function(df){
   probs$pAgivenC <- as.numeric(Map("/", probs$pca, probs$pc))
   probs$pAgivenNC <- as.numeric(Map("/", probs$pnca, 1-probs$pc))
   probs$pCgivenNA <- as.numeric(Map("/", probs$pcna, 1-probs$pa))
+  probs$pNCgivenNA <- as.numeric(Map("/", probs$pncna, 1-probs$pa))
   return(probs)
 }
 
