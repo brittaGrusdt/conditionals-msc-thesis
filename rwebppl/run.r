@@ -1,41 +1,33 @@
+source("running-functions.r")
 require("grid")
 require("gridExtra")
-require("rwebppl")
-source("data-processing-functions.r")
-##########################################
-
-posterior <- function(model_path){
-  listener <- webppl(program_file = model_path)
-  return(listener)
-}
-
-eval <- function(listener, listenerType, inferType){
-  if(inferType == "samples"){
-    df <- buildDF_from_samples(listener)
-    ps <- rep(1/length(df$jointP), length(df$jointP))
-  }else{
-    df <- buildDF_from_enumerate(listener)
-    ps <- listener$prob
-  }
-  probs <- computeProbs(df)
-  EVs <- computeEVs(probs, ps, listenerType)
-  return(EVs)
-}
-########################
+# ----------------- #
+# Parameters #### 
 baseDir <- "/home/britta/UNI/Masterarbeit/conditionals/model/listener/"
-#model_path <- paste(baseDir, "listener-networkPriors-biscuits-cp.wppl", sep="")
-# model_path <- paste(baseDir, "hpotheses-approach-ll-Not-conditioned-on-cn.wppl", sep="")
-model_path <- paste(baseDir, "hypotheses-approach-ll-conditioned-on-cn.wppl", sep="")
+model_path <- paste(baseDir, "listener-concrete-hypotheses.wppl", sep="")
 
-listenerType <- "simple"
-listenerType <- "biscuits"
-listenerType <- "perfection"
-listener <- posterior(model_path)
-df <- buildDF_from_samples(listener)
-result <- eval(listener, listenerType, "samples")
+# parameters for processing in R:
+inferenceType <- "enumerate"
 
-#####################
+listenerTypes <- c("", "lawn-negotiable", "lawn-non-negotiable", "pizza")
+# ,
+#                    "wason-ind", "wason-dep")
+listenerTypes <- c("wason-a", "wason-na", "wason-c", "wason-nc")
+all_results <- data.frame()
+for (lt in listenerTypes) {
+  # parameters for webppl program:
+  data <- list(bias=lt)
+  listener <- posterior_with_data_input(model_path, data)
+  if(lt==""){lt<-"simple"}
+  result <- eval(listener, lt, inferenceType)
+  all_results <- rbind(all_results, result)
+}
+
+# PLOTTING  ####
 grid.newpage()
-grid.table(t(result))
+grid.table(t(all_results))
+# grid.table(t(all_results[1:3,]))
+# grid.newpage()
+# grid.table(t(all_results[c(1,4:6),]))
 
-# result <- rbind(simple,biscuits, perfection)
+
