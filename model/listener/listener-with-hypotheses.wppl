@@ -299,8 +299,8 @@ var displayLL = function(utterance, query){
     viz(marginalize(LL, function(x){return {panc: x[2]}}))
     viz(marginalize(LL, function(x){return {pnanc: x[3]}}))
   }else if(query=='cn'){
-    var LL = literalListener(utterance, 'cn')
-    var summarized = summarizeListenerCNs(pragListener)
+    var LL = literalListener(utterance, 'bn')
+    var summarized = summarizeListenerCNs(LL)
     viz(LL)
     viz(summarized)
   }else{error('only marginals supported for visualizing')}
