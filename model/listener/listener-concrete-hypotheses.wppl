@@ -11,22 +11,19 @@ var independentProbs = [[t, t], [t, f], [t, maybe],
 
 // 2. samples for dependent graphs
 // samples: P(A),P(C|A),P(C|not A) or P(C),P(A|C),P(A|not C)
-var dependentProbs = [[t,t, f], [f, t, f], [maybe, t, f],
+var dependentProbs = [[t, t, f], [f, t, f], [maybe, t, f],
 [t, t, maybe], [f, t, maybe], [maybe, t, maybe],
 [t, f, t], [f, f, t], [maybe, f, t],
 [t, f, maybe], [f, f, maybe], [maybe, f, maybe],
 [t, maybe, t], [f, maybe, t], [maybe, maybe, t],
-[t, maybe, f], [f, maybe, f], [maybe, maybe, f],
-[t, maybe, maybe], [f, maybe, maybe], [maybe, maybe, maybe]]
+[t, maybe, f], [f, maybe, f], [maybe, maybe, f]]
 
 ////////////  SET PARAMETERS  /////////////////
-var biasFactor = 20
+var biasFactor = 4
 
 var speakerOptimality = 5
 var threshold = 0.9
 var threshold_likely = 0.5
-var nsamples = 1500
-var ntables = 500
 
 var utterances = ["A", "C", "If A, C", "If C, A", "not A", "not C", "If A, not C",
                   "If not A, C", "If not A, not C", "If C, not A", "If not C, A",
@@ -35,11 +32,9 @@ var utterances = ["A", "C", "If A, C", "If C, A", "not A", "not C", "If A, not C
 //                   "A exor C",
 //                   "Either both or none",
                   // "likely A", "likely C"]
-var causalNets = ["A ind. C",
-          "A implies C", "A implies not C",
-                  "not A implies C", "not A implies not C",
-                  "C implies A", "C implies not A",
-                  "not C implies A", "not C implies not A"]
+var independentNets = ["A ind. C"]
+var dependentNets = ["A implies C", "C implies A"]
+var causalNets = independentNets.concat(dependentNets)
 /////////////////////////////////////////////
 var buildTable = function(probs, cn){
   var table =
@@ -51,33 +46,9 @@ var buildTable = function(probs, cn){
         [probs[0]*probs[1], (1-probs[0])*probs[2],
          probs[0]*(1-probs[1]), (1-probs[0])*(1-probs[2])] :
 
-    cn=='A implies not C' ?
-        [(1-probs[1]) * probs[0], (1-probs[2]) * (1-probs[0]),
-         probs[1] * probs[0]    , probs[2] * (1-probs[0])] :
-
-    cn=='not A implies C' ?
-        [(1-probs[0])*probs[2]    , probs[1] * probs[0],
-         (1-probs[0])*(1-probs[2]), (1-probs[1])*probs[0]] :
-
-    cn=='not A implies not C' ?
-        [(1-probs[2]) * (1-probs[0]), (1-probs[1]) * probs[0],
-         probs[2] * (1-probs[0])    , probs[1]*probs[0]] :
-
     cn=='C implies A' ?
         [probs[0]*probs[1]    , (1-probs[1]) * probs[0],
          probs[2]*(1-probs[0]), (1-probs[2])*(1-probs[0])] :
-
-    cn=='C implies not A' ?
-        [(1-probs[1]) * probs[0]   , probs[1] * probs[0],
-        (1-probs[2]) * (1-probs[0]), probs[2] * (1-probs[0])] :
-
-    cn=='not C implies A' ?
-        [(1-probs[0])*probs[2], (1-probs[2]) * (1-probs[0]),
-         probs[1]*probs[0], (1-probs[1])*probs[0]] :
-
-    cn=='not C implies not A' ?
-        [(1-probs[2]) * (1-probs[0]), probs[2] * (1-probs[0]),
-         (1-probs[1]) * probs[0], probs[1]*probs[0]] :
 
     error("probability table cannot be build for cn " + cn)
     return table
@@ -131,26 +102,37 @@ return holds
 })
 
 //PRIORS
-var networkPrior = function() {
-  var net = uniformDraw(causalNets)
+var networkPrior = function(isDependent) {
+  var net = isDependent ? uniformDraw(dependentNets) :
+  uniformDraw(independentNets)
   return net
 }
-
 var bayesNetPrior = cache(function(bias){
   return Infer({method:'enumerate', model:function(){
-    var cn = networkPrior()
+    var dependent = flip()
+    var cn = networkPrior(dependent)
     var probs = cn=='A ind. C' ? uniformDraw(independentProbs) :
       uniformDraw(dependentProbs)
-
     var table = buildTable(probs, cn)
-    // if(bias==){
-        // factor(independentNets.includes(causalNet) ||
-          // biscuitNets.includes(causalNet) ? -Math.log(1/biasFactor) : 0)
 
-    // } else if(bias==''){
-       // factor(dependentNets.includes(causalNet) ||
-              // perfectionNets.includes(causalNet) ? -Math.log(1/biasFactor) : 0)
-    // }
+    if(bias){
+      if(cn=='A ind. C'){
+        var vote = bias=='pizza' ? (probs[0]==maybe && probs[1]==t ?
+                                    -Math.log(1/biasFactor) : 0) :
+        bias=='wason-ind' ? -Math.log(1/biasFactor) : 0
+        factor(vote)
+      }else{
+       var vote = bias=='lawn-non-negotiable' ?
+          (probs[0]==maybe && probs[1]==t && probs[2]==f ?
+            -Math.log(1/biasFactor) : 0) :
+        bias=='lawn-negotiable' ?
+          (probs[0]==maybe && probs[1]==t && probs[2]==maybe ?
+            -Math.log(1/biasFactor) : 0) :
+        bias=='wason-dep' ? -Math.log(1/biasFactor) : 0
+
+        factor(vote)
+       }
+    }
     return {'cn': cn, 'jointP': table}
   }})
 })
@@ -159,7 +141,7 @@ var bayesNetPrior = cache(function(bias){
 var literalListener = cache(function(utterance, query, cn, bias){
   Infer({method:'enumerate',model: function(){
     var bn = sample(bayesNetPrior(bias))
-    condition(bn.cn==cn)
+//     condition(bn.cn==cn)
     condition(meaning(utterance, bn['jointP']))
     if(query == 'cn'){return bn['cn']}
     else if(query == 'jointP'){return bn['jointP']}
@@ -212,9 +194,7 @@ var speaker = cache(function(table, qud, cn, bias){
 })
 
 var listener = function(utterance, qud, bias){
-//   return Infer({method:'MCMC', samples:nsamples, lag:1, burn:100,
-//                 callbacks: [editor.MCMCProgress()],  model:function(){
-    return Infer({method:'rejection',samples:nsamples, model:function(){
+   return Infer({method:'enumerate', model:function(){
       var bn = sample(bayesNetPrior(bias))
       observe(speaker(bn['jointP'], qud, bn.cn, bias),utterance)
       return bn
@@ -250,7 +230,10 @@ var displayS = function(utterance, qud, cn, bias){
 
 var displayPL = function(pragListener){
   viz(marginalize(pragListener, function(bn){return{causalNet: bn.cn}}))
-  viz(marginalize(pragListener, function(bn){return{jointP: bn.jointP}}))
+  viz(marginalize(pragListener, function(bn){return{causalNets:
+    dependentNets.includes(bn.cn) ? 'dependent' : 'independent'}}))
+  //   viz(pragListener)
+//   viz.table(marginalize(pragListener, function(bn){return{jointP: bn.jointP}}))
 //   viz(marginalize(pragListener, function(bn){return {pC: pc(bn['jointP'])}}))
 //   viz(marginalize(pragListener, function(bn){return {pA: pa(bn['jointP'])}}))
 //   viz(marginalize(pragListener, function(bn){
@@ -276,17 +259,32 @@ var evs = function(pragListener){
 }
 //PLOTS
 var utterance = "If A, C"
-
-var causalNet = "A implies C"
-var query = "jointP"
+// var utterance = "A"
 var qud = ""
-var bias = ""
-// viz(marginalize(bayesNetPrior(''), function(bn){bn.cn}))
+
+// var causalNet = "A implies C"
+// var causalNet = "A ind. C"
+// var causalNet = "C implies A"
+// var query = "jointP"
+// var bias = "pizza"
+// var bias = "lawn-negotiable"
+// var bias = "lawn-non-negotiable"
+// var bias = "wason-ind"
+// var bias = ""
+var bias = myDF["bias"][0]
+
+// display('Bayes Net Prior')
+// viz.table(bayesNetPrior(bias))
+// viz(marginalize(bayesNetPrior(bias), function(bn){bn.cn}))
+// viz(marginalize(bayesNetPrior(bias), function(bn){
+//   dependentNets.includes(bn.cn) ? 'dependent' : 'independent'}))
 
 // Literal listener
 // displayLL(utterance, 'cn', causalNet, bias)
 // display('LL_avg for utterance: ' + utterance)
 // display(get_LL_avg(utterance, causalNet, bias))
+// map(function(utterance){print(utterance + get_LL_avg(utterance, causalNet))},
+//     utterances)
 
 // Pragmatic speaker
 // var p = [0.677, 0.29, 0.001, 0.032]
@@ -294,6 +292,7 @@ var bias = ""
 // var p = [0.246, 0.321, 0.014, 0.419]
 // var p = [0.048, 0.617, 0.003, 0.332]
 // var p = [0.024375,0.365625,0.0006250000000000006,0.609375]
+// var p = [0.475,0.025,0.475,0.025]
 // display('Pragmatic speakers table: ' + p)
 // viz(speaker(p, qud, causalNet, bias))
 
@@ -303,9 +302,8 @@ var bias = ""
 display('Pragmatic Listener hears: ' + utterance)
 
 var pragListener = listener(utterance, qud, bias)
-display('nb distinct samples: ' + Object.keys(pragListener.getDist()).length)
-displayPL(pragListener)
+// displayPL(pragListener)
 
 var listenerProbs = marginalize(pragListener, function(bn){return bn['jointP']})
-print(evs(listenerProbs))
-// pragListener
+// print(evs(listenerProbs))
+pragListener
