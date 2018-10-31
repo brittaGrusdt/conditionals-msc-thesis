@@ -8,6 +8,7 @@ posterior <- function(model_path){
 }
 posterior_with_data_input <- function(model_path, data){
   listener <- webppl(program_file = model_path, data=data, data_var='myDF')
+  return(listener)
 }
 
 eval <- function(listener, listenerType, inferType){

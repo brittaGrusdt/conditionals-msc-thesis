@@ -26,6 +26,16 @@ visualizeR <- function(df, utterance){
         main=paste("Pragmatic Listener hears: ",utterance, sep=""))
 }
 
+visualizeCNs <- function(listener, infType, listenerType){
+  if(infType=='samples'){
+      df <- buildDF_from_samples(listener)
+  }else{
+    df <- buildDF_from_enumerate(listener)
+  }
+  qplot(x = factor(unlist(df$cn)), data = df,
+        xlab="causal nets", ylab="frequency")
+}
+
 
 #### Visualization with webppl
 disp <- "viz(myDF)"

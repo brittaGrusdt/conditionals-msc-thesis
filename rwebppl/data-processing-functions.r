@@ -12,9 +12,9 @@ buildDF_from_samples <- function(listener){
 
 buildDF_from_enumerate <- function(listener){
   df <- data.frame(matrix(ncol = 3, nrow = length(listener$jointP)))
-  colnames(df) <- c("jointP", "causalNet", "prob")
+  colnames(df) <- c("jointP", "cn", "prob")
   df$jointP = listener$jointP
-  df$causalNet = listener$causalNet
+  df$cn = listener$cn
   df$prob = listener$prob
   return(df)
 }
