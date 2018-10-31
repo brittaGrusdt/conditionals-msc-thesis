@@ -170,9 +170,9 @@ var bayesNetPrior = cache(function(bias){
       var vote = bias=='douven1' ? (pc(table)>=t ? -Math.log(1/biasFactor) : 0) :
       bias=='pizza' ? (pc(table)>=threshold ? -Math.log(1/biasFactor) : 0) :
       bias=='lawn-non-negotiable' ?
-          (probs[0]<=m && probs[2]<=f ? -Math.log(1/biasFactor) : 0) :
+          (probs[2]<=f ? -Math.log(1/biasFactor) : 0) :
       bias=='lawn-negotiable' ?
-          (probs[0]<=m && probs[2]>=m ? -Math.log(1/biasFactor) : 0) :
+          (probs[2]>=m ? -Math.log(1/biasFactor) : 0) :
       bias=='douven2' ? (probs[0]>=ul && probs[0]<=m &&
                          (pc(table)>=m && pc(table)<=l)
                           ? -Math.log(1/biasFactor) : 0) :
@@ -272,7 +272,8 @@ var displayPL = function(pragListener){
   viz(marginalize(pragListener, function(bn){return{causalNets:
     dependentNets.includes(bn.cn) ? 'dependent' : 'independent'}}))
   var listenerProbs = marginalize(pragListener, function(bn){return bn['jointP']})
-  print(evs(listenerProbs))
+  // print(evs(listenerProbs))
+  display(evs(listenerProbs))
 }
 
 var getEVs = function(listener, probFunc){
