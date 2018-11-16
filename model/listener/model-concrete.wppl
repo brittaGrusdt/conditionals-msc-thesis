@@ -15,7 +15,7 @@ var dependentCA = ["C implies A", "C implies -A", "-C implies A", "-C implies -A
 var dependentNets = dependentAC.concat(dependentCA)
 var causalNets = independentNets.concat(dependentNets)
 
-var params = {'': {'p_ind': 1/3, 'beta0': 0.1},
+var params = {'': {'p_ind': 1/3, 'beta0': 0},
              'lawn-negotiable':{'p_ind':1/3, 'beta0':0},
              'lawn-non-negotiable': {'p_ind': 1/3, 'beta0':0},
              'pizza': {'p_ind': 1, 'beta0':1},
