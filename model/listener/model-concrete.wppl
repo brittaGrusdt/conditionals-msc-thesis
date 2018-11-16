@@ -1,112 +1,92 @@
-// Samples for graphs
-var t = 0.95
-var f = 0.05
-var m = 0.5
-var l = 0.7
-var ul = 0.3
-var zero = 0.0001
-var one = 0.9999
-// 1. samples for independent graphs
-// samples: P(A), P(C)
-var independentProbs = [
-  [zero, zero], [zero, one], [zero, t], [zero, f], [zero, m], [zero, l], [zero, ul],
-  [one, zero], [one, one], [one, t], [one, f], [one, m], [one, l], [one, ul],
-  [t, zero], [t, one], [t, t], [t, f], [t, m], [t, l], [t, ul],
-  [f, zero], [f, one], [f, t], [f, f], [f, m], [m, l], [m, ul],
-  [m, zero], [m, one], [m, t], [m, f], [m, m], [m, l], [m, ul],
-  [l, zero], [l, one], [l, t], [l, f], [l, m], [l, l], [l, ul],
-  [ul, zero], [ul, one], [ul, t], [ul, f], [ul, m], [ul, l], [ul, ul]]
-
-// 2. samples for dependent graphs
-// samples: P(A),P(C|A),P(C|-A)
-// A->C; P(C|A)>P(C|-A)
-var dependentPosProbs =[
-  [f, f,zero], [ul, f,zero], [m, f,zero], [l, f,zero], [t, f,zero],
-
-  [f, ul,f],    [ul, ul,f],    [m, ul,f],    [l, ul,f],    [t, ul,f],
-  [f, ul,zero], [ul, ul,zero], [m, ul,zero], [l, ul,zero], [t, ul,zero],
-
-  [f, m,ul],   [ul, m,ul],   [m, m,ul],   [l, m,ul],   [t, m,ul],
-  [f, m,f],    [ul, m,f],    [m, m,f],    [l, m,f],    [t, m,f],
-  [f, m,zero], [ul, m,zero], [m, m,zero], [l, m,zero], [t, m,zero],
-
-  [f, l,m],    [ul, l,m],    [m, l,m],    [l, l,m],    [t, l,m],
-  [f, l,ul],   [ul, l,ul],   [m, l,ul],   [l, l,ul],   [t, l,ul],
-  [f, l,f],    [ul, l,f],    [m, l,f],    [l, l,f],    [t, l,f],
-  [f, l,zero], [ul, l,zero], [m, l,zero], [l, l,zero], [t, l,zero],
-
-  [f, t,l],    [ul, t,l],    [m, t,l],    [l, t,l],    [t, t,l],
-  [f, t,m],    [ul, t,m],    [m, t,m],    [l, t,m],    [t, t,m],
-  [f, t,ul],   [ul, t,ul],   [m, t,ul],   [l, t,ul],   [t, t,ul],
-  [f, t,f],    [ul, t,f],    [m, t,f],    [l, t,f],    [t, t,f],
-  [f, t,zero], [ul, t,zero], [m, t,zero], [l, t,zero], [t, t,zero],
-
-  [f, one,t],    [ul, one,t],    [m, one,t],    [l, one,t],    [t, one,t],
-  [f, one,l],    [ul, one,l],    [m, one,l],    [l, one,l],    [t, one,l],
-  [f, one,m],    [ul, one,m],    [m, one,m],    [l, one,m],    [t, one,m],
-  [f, one,ul],   [ul, one,ul],   [m, one,ul],   [l, one,ul],   [t, one,ul],
-  [f, one,f],    [ul, one,f],    [m, one,f],    [l, one,f],    [t, one,f],
-  [f, one,zero], [ul, one,zero], [m, one,zero], [l, one,zero], [t, one,zero]
-]
-// A -> -C; P(C|A)< P(C|-A)
-var dependentNegProbs = [
-  [f, zero,f],    [ul, zero,f],    [m, zero,f],    [l, zero,f],    [t, zero,f],
-  [f, zero,ul],   [ul, zero,ul],   [m, zero,ul],   [l, zero,ul],   [t, zero,ul],
-  [f, zero,m],    [ul, zero,m],    [m, zero,m],    [l, zero,m],    [t, zero,m],
-  [f, zero,l],    [ul, zero,l],    [m, zero,l],    [l, zero,l],    [t, zero,l],
-  [f, zero,t],    [ul, zero,t],    [m, zero,t],    [l, zero,t],    [t, zero,t],
-  [f, zero,one],  [ul, zero,one],  [m, zero,one],  [l, zero,one],  [t, zero,one],
-
-  [f, f,ul],    [ul, f,ul],    [m, f,ul],    [l, f,ul],    [t, f,ul],
-  [f, f,m],     [ul, f,m],     [m, f,m],     [l, f,m],     [t, f,m],
-  [f, f,l],     [ul, f,l],     [m, f,l],     [l, f,l],     [t, f,l],
-  [f, f,t],     [ul, f,t],     [m, f,t],     [l, f,t],     [t, f,t],
-  [f, f,one],   [ul, f,one],   [m, f,one],   [l, f,one],   [t, f,one],
-
-  [f, ul,m],   [ul, ul,m],   [m, ul,m],   [l, ul,m],   [t, ul,m],
-  [f, ul,l],   [ul, ul,l],   [m, ul,l],   [l, ul,l],   [t, ul,l],
-  [f, ul,t],   [ul, ul,t],   [m, ul,t],   [l, ul,t],   [t, ul,t],
-  [f, ul,one], [ul, ul,one], [m, ul,one], [l, ul,one], [t, ul,one],
-
-  [f, m,l],   [ul, m,l],   [m, m,l],   [l, m,l],   [t, m,l],
-  [f, m,t],   [ul, m,t],   [m, m,t],   [l, m,t],   [t, m,t],
-  [f, m,one], [ul, m,one], [m, m,one], [l, m,one], [t, m,one],
-
-  [f, l,t],   [ul, l,t],   [m, l,t],   [l, l,t],   [t, l,t],
-  [f, l,one], [ul, l,one], [m, l,one], [l, l,one], [t, l,one],
-
-  [f, t,one], [ul, t,one], [m, t,one], [l, t,one], [t, t,one]
-]
-var dependentProbs = dependentPosProbs.concat(dependentNegProbs)
-var ac = filter(function(x){return x[1] >= t}, dependentProbs) // ca
-var anc = filter(function(x){return x[1] <= f}, dependentProbs) // cna
-var nac = filter(function(x){return x[2] >= t}, dependentProbs) // nca
-var nanc = filter(function(x){return x[2] <= f}, dependentProbs) //ncna
-// var z = map(function(x){print(x.length)}, [ac,anc,nac,nanc])
 ////////////  SET PARAMETERS  /////////////////
-var biasFactor = 100
-var speakerOptimality = 10
-var threshold = 0.9
-var threshold_likely = 0.5
-var beta0 = 0
-var beta1 = 1-beta0
-
+var alpha = 5
+var thresholds = {t: 0.9, f: 0.05, random: 0.5, unlikely: 0.3, likely: 0.7,
+                  meaning: 0.8}
 var ifUtts = ["If A, C", "If A, -C", "If -A, C", "If -A, -C",
               "If C, A", "If C, -A", "If -C, A", "If -C, -A"]
-var simpleUtts = ["", "A", "C", "-A", "-C"]
+var simpleUtts = ["", "A", "C", "-A", "-C",
+                  "likely A", "likely C", "likely -A", "likely -C"]
 var conjunctiveUtts = ["A and C", "C but -A", "A but -C", "neither A nor C",
-                  "-A or -C", "A or -C", "-A or C", "A or C"]
+                      "A exor C", "Either both or none"]
 var utterances = simpleUtts.concat(conjunctiveUtts).concat(ifUtts)
 var independentNets = ["A ind. C"]
-var dependentNets = ["A implies C", "A implies -C", "-A implies C", "-A implies -C"]
-//                      "C implies A", "C implies -A", "-C implies A", "-C implies -A"]
+var dependentAC = ["A implies C", "A implies -C", "-A implies C", "-A implies -C"]
+var dependentCA = ["C implies A", "C implies -A", "-C implies A", "-C implies -A"]
+var dependentNets = dependentAC.concat(dependentCA)
 var causalNets = independentNets.concat(dependentNets)
 
-var p_ind = 0.7
-var cnPriors = [p_ind].concat(repeat(dependentNets.length,
-                                   function(){(1-p_ind)/dependentNets.length}))
-// var cnPriors = repeat(dependentNets.length+1,
-//                      function(){1/(dependentNets.length+1)})
+var params = {'': {'p_ind': 1/3, 'beta0': 0},
+             'lawn-negotiable':{'p_ind':1/3, 'beta0':0},
+             'lawn-non-negotiable': {'p_ind': 1/6, 'beta0':0.9},
+             'pizza': {'p_ind': 1, 'beta0':1},
+             'douven1': {'p_ind': 1/3, 'beta0': 0.5},
+             'wason-abstract': {'p_ind': 1/3, 'beta0':0},
+             'wason-concrete': {'p_ind': 1/8, 'beta0':0.4}}
+
+/////////   FOR R-SCRIPT   //////////////////
+// var p = myDF["p_ind"][0]
+// var p = Math.round(p*100)/100
+// var b = myDF["beta0"][0]
+// var b = Math.round(b*100)/100
+// var params = {'wason-concrete': {'p_ind':  p, 'beta0': b},
+//                '': {'p_ind':p, 'beta0': b},
+//                'wason-abstract': {'p_ind': p, 'beta0': b},
+//                'pizza': {'p_ind': p, 'beta0': b},
+//                'lawn-non-negotiable': {'p_ind': p, 'beta0': b},
+//                'douven1': {'p_ind': p, 'beta0': b}}
+/////////////////////////////////////////////
+var pvals = {t: 0.95, f: 0.05, m: 0.5, l: 0.7, ul: 0.3}
+var vals = [0.05, 0.3, 0.5, 0.7, 0.95]
+var vals2 = [0.1,0.2, 0.4, 0.6, 0.8]
+// 1. samples for independent graphs
+// samples: P(A), P(C)
+var p_ind = function(vals){
+  map(function(x){
+    return map(function(idx){
+    return [x, vals[idx]]
+  }, _.range(vals.length))
+}, vals)}
+var independentProbs1 = reduce(function(x, acc){
+  return acc.concat(x);}, [], p_ind(vals));
+var independentProbs2 = reduce(function(x,acc){
+  return acc.concat(x);}, [], p_ind(vals2));
+var independentProbs = independentProbs1.concat(independentProbs2)
+
+// 2. samples for dependent graphs
+// samples: P(A),P(C|A),P(C|-A) or P(C), P(A|C), P(A|-C)
+var p_dep = map(function(x){
+  return map(function(tuple){return tuple.concat(x)},
+             independentProbs1)
+}, vals)
+var dependentProbs = reduce(function(x,acc){
+  return acc.concat(x);}, [], p_dep);
+
+var ac = filter(function(x){return  x[1]>=thresholds.likely}, dependentProbs) //ca
+var anc = filter(function(x){return x[1]<=thresholds.unlikely}, dependentProbs) //cna
+var nac = filter(function(x){return x[2]>=thresholds.likely}, dependentProbs) //nca
+var nanc = filter(function(x){return x[2]<=thresholds.unlikely}, dependentProbs)//ncna
+// map(function(x){print(x.length)}, [ac,anc,nac,nanc, independentProbs])
+
+var probsPrior = function(cn){
+  var probs = cn=='A ind. C' ? uniformDraw(independentProbs) :
+  cn=="A implies C" || cn=="C implies A" ? uniformDraw(ac) :
+  cn=='A implies -C' || cn=="C implies -A" ? uniformDraw(anc) :
+  cn=='-A implies C' || cn=="-C implies A" ? uniformDraw(nac) :
+  cn=='-A implies -C' || cn=="-C implies -A" ? uniformDraw(nanc):
+  error('unknown cn probsPrior: ' + cn)
+  return probs
+}
+
+var getCNpriors = function(p_ind){
+  return [p_ind].concat(repeat(dependentNets.length,
+                               function(){(1-p_ind)/dependentNets.length}))
+}
+var networkPrior = function(bias) {
+  return categorical({vs: causalNets, ps: getCNpriors(params[bias].p_ind)})
+}
+var roundTo3 = function(x){
+  return Math.round(x*1000)/1000
+}
 ///////////////////////////////////////////
 var buildTable = function(probs, cn){
   var table = cn=='A ind. C' ?
@@ -128,7 +108,6 @@ var buildTable = function(probs, cn){
 
   return table
 }
-
 // marginal probabilities
 var pa = function(x){return x[0]+x[2]}
 var pc = function(x){return x[0]+x[1]}
@@ -158,6 +137,8 @@ var utteranceProbs = cache(function(utterance, table){
   utterance == "Either both or none" ? table[0]+table[3] :
   utterance == "likely A" ? table[0] + table[2] :
   utterance == "likely C" ? table[0] + table[1] :
+  utterance == "likely -A" ? table[1] + table[3] :
+  utterance == "likely -C" ? table[2] + table[3] :
   utterance == "A exor C" ? table[1] + table[2] :
   utterance == "A and C" ? table[0] :
   utterance == "neither A nor C" ? table[3] :
@@ -175,57 +156,39 @@ var utteranceProbs = cache(function(utterance, table){
 var meaning = cache(function(utterance, table, cn){
  var p = utteranceProbs(utterance, table)
  var p_holds = utterance.includes('likely') ?
-     (p > threshold_likely) : p > threshold
-
+     (p > thresholds.random) : p > thresholds.meaning
  return p_holds
-//  var cn_holds = ifUtts.concat(conjunctiveUtts).includes(utterance) ?
-//      dependentNets.includes(cn) : independentNets.includes(cn)
-//  return p_holds && cn_holds
 })
 
-//PRIORS
-var networkPrior = function() {
-  return categorical({vs: causalNets, ps:cnPriors})
-}
 var bayesNetPrior = cache(function(bias){
   return Infer({method:'enumerate', model:function(){
-    var cn = networkPrior()
-    var probs =
-        cn=='A ind. C' ? uniformDraw(independentProbs) :
-        cn=="A implies C" || cn=="C implies A" ? uniformDraw(ac) :
-        cn=='A implies -C' || cn=="C implies -A" ? uniformDraw(anc) :
-        cn=='-A implies C' || cn=="-C implies A" ? uniformDraw(nac) :
-        cn=='-A implies -C' || cn=="-C implies -A" ? uniformDraw(nanc) :
-    error('no probs defined for cn: ' + cn)
+    var cn = networkPrior(bias)
+    var probs = probsPrior(cn)
     var table = buildTable(probs, cn)
-
-    if(bias){
-      var vote = bias=='douven1' ? (pc(table)>=l ? -Math.log(1/biasFactor) : 0) :
-      bias=='pizza' ? (cn=='A ind. C' ? -Math.log(1/biasFactor) : 0) :
-      bias=='lawn-non-negotiable' ? (pCgivenNA(table)<=f ? -Math.log(1/biasFactor) : 0) :
-      bias=='lawn-negotiable' ? (pCgivenNA(table)>=m ? -Math.log(1/biasFactor) : 0) :
-      bias=='douven2' ? (cn=='A ind. C' && pa(table)<=ul &&
-        (pc(table)>m && pc(table)<l) ? -Math.log(1/biasFactor) : 0) :
-      bias=='douven3' ? (pc(table)<=ul ? -Math.log(1/biasFactor) : 0) : 0
-      factor(vote)
+    if(bias=='lawn-non-negotiable'){
+      if(pCgivenNA(table)<=thresholds.f){factor(-Math.log(thresholds.f))}
+    }else if(bias=='douven1'){
+      if(pc(table)>=thresholds.t){factor(-Math.log(thresholds.f))}
+    }else if(bias=='lawn-negotiable'){
+      if(pCgivenNA(table)>=thresholds.random && pCgivenNA(table)<=thresholds.likely){
+        factor(-Math.log(thresholds.f))
+      }
     }
     return {'cn': cn, 'jointP': table}
   }})
 })
 
-// MODEL
 var literalListener = cache(function(utterance, qud, bias){
   Infer({method:'enumerate',model: function(){
     var bn = sample(bayesNetPrior(bias))
-    var m = meaning(utterance, bn.jointP, bn.cn)
-    condition(m)
+    condition(meaning(utterance, bn.jointP))
     if(qud=='cn'){return bn.cn}
     else if(qud == 'jointP'){return bn.jointP}
     else{return bn}
   }})
-})
+}, 10000)
 
-var KL = function(true_probability_input, approx_probability_input){
+var KL = cache(function(true_probability_input, approx_probability_input){
   var true_probability = _.isArray(true_probability_input) ?
      true_probability_input :
      [true_probability_input, 1 - true_probability_input]
@@ -239,7 +202,7 @@ var KL = function(true_probability_input, approx_probability_input){
       true_probability[cell] *
        Math.log(true_probability[cell] / approx_probability[cell])
     }}, _.range(true_probability.length)))
-}
+}, 10000)
 
 var get_LL_avg = cache(function(listener) {
   var listener_avg = map(function(cell){ sum(map(function(table) {
@@ -249,41 +212,43 @@ var get_LL_avg = cache(function(listener) {
   return(listener_avg)
 })
 
-var get_EU_avg = function(LL, table, qud) {
+var get_EU_avg = cache(function(LL, table) {
   var LL_avg = get_LL_avg(LL)
-  var utility = qud=='C' ? -KL(pc(table), pc(LL_avg)) :
-                qud=='A' ? -KL(pa(table), pa(LL_avg)) : -KL(table, LL_avg)
+  var utility = -KL(table, LL_avg)
   return utility
-}
-var speaker = cache(function(table, qud, cn, bias){
+},10000)
+
+var speaker = cache(function(table,cn,bias){
   return Infer({method:'enumerate', model: function(){
     var utterance = uniformDraw(utterances)
-    var LL = literalListener(utterance, 'bn', bias)
-    var LLcn = marginalize(LL, function(bn){bn.cn})
-    var utility_cn = LLcn.support().includes(cn) ?
-        beta1 * LLcn.score(cn) : -Infinity
+    var LLcn = literalListener(utterance, 'cn', bias)
+    var LLp = literalListener(utterance, 'jointP', bias)
 
-    var LLp = marginalize(LL, function(bn){bn.jointP})
-    var utility_p = beta0 * get_EU_avg(LLp, table, qud)
+    var utility_cn =  LLcn.score(cn)
+//     var utility_p = LLp.score(table)
+    var utility_p = get_EU_avg(LLp, table)
 
-    factor(speakerOptimality * (utility_p+utility_cn))
+    var utility = (utility_cn==-Infinity  || utility_p==-Infinity) ?
+        -Infinity : alpha *
+        ((1-params[bias].beta0) * utility_cn + params[bias].beta0 * utility_p)
+    factor(utility)
+
     return utterance
   }
  })
-})
-var listener = function(utterance, qud, bias){
-   return Infer({method:'enumerate', model:function(){
-      var bn = sample(bayesNetPrior(bias))
-      observe(speaker(bn.jointP, qud, bn.cn, bias),utterance)
-      return bn
-    }
-   })
+}, 10000)
+var listener = function(utterance, bias){
+  return Infer({method:'enumerate', model:function(){
+                  var bn = sample(bayesNetPrior(bias))
+                  observe(speaker(bn.jointP, bn.cn, bias),utterance)
+                  return bn
+                }})
 }
-
 //// VISUALIZATIONS ////
 var marginalizeDependentNets = function(listener){
   return marginalize(listener, function(bn){
-    return{causalNets: dependentNets.includes(bn.cn) ? 'dependent' : 'independent'}
+    return{causalNets: dependentAC.includes(bn.cn) ? 'A implies C' :
+           dependentCA.includes(bn.cn) ? 'C implies A' : 'independent'}
   })
 }
 
@@ -305,58 +270,70 @@ var evs = function(listener){
 var displayListener = function(listener, utterance, listenerType, bias){
   display([listenerType, utterance, bias].join(" %% "))
   viz(marginalize(listener, function(bn){return{causalNet: bn.cn}}))
-//   viz(marginalizeDependentNets(listener))
+  viz(marginalizeDependentNets(listener))
   var listenerProbs = marginalize(listener, function(bn){return bn['jointP']})
   print(evs(listenerProbs))
+//   viz.table(listener, {groupBy:'cn'})
 }
-var displaySpeaker = function(utterance, qud, cn, bias, p){
-  display(qud ? 'qud: '.concat(qud) : 'qud: '.concat('not used'))
+
+var displaySpeaker = function(bias, state){
   display(bias ? 'bias: '.concat(bias) : 'no bias')
-//   var LL = sample(literalListener(utterance, "bn", bias))
-  var LL = sample(bayesNetPrior(bias))
-  var table = p ? p : LL.jointP
-  var net = cn ? cn : LL.cn
-  print('speaker p: ' + table)
-  print('speaker cn: ' + net)
-  viz(speaker(table, qud, net, bias))
+  var state = state.sample=='LL' ?
+      sample(literalListener(state.utterance, "bn", bias)) : (state.sample=='prior' ?
+  sample(bayesNetPrior(bias)) : state)
+  print('speaker p: ' + state.jointP)
+  print('speaker cn: ' + state.cn)
+  viz(speaker(state.jointP, state.cn, bias))
 }
 //-----SETUP VARIABLES-----//
-var utterance = ""
-// var utterance = "A"
-var utterance = "If A, C"
-var qud = ""
+var utterance = "If A, -C"
+// var utterance = ""
 
 var bias = ""
-var bias = "pizza"
+// var bias = "wason-abstract"
+// var bias = "wason-concrete"
+// var bias = "pizza"
 // var bias = "lawn-negotiable"
 // var bias = "lawn-non-negotiable"
-// var bias = "douven3"
+var bias = "douven1"
 
 //-----MAKE PLOTS-----//
-var prior = bayesNetPrior(bias)
-displayListener(prior, '', 'Bayes Net Prior', bias)
-// var z = map(function(bias){
-//   var prior = bayesNetPrior(bias)
-//   displayListener(prior, '', 'Bayes Net Prior', bias)
-//   }, ["", "pizza", "lawn-negotiable", "lawn-non-negotiable", "douven3"])
+display('speakerOptimality: ' + alpha)
+display('speaker beta0 (p): ' + params[bias].beta0)
+
+// var prior = bayesNetPrior(bias)
+// displayListener(prior, '', 'Bayes Net Prior', bias)
 
 var LL = literalListener(utterance, 'bn', bias)
 displayListener(LL, utterance, 'LL', bias)
 // var z = map(function(utterance){
+//   print(utterance)
 //   var LL = literalListener(utterance, 'bn', bias)
-//   displayListener(LL, utterance, 'LL', bias)
-//   }, utterances)
+// //   displayListener(LL, utterance, 'LL', bias)
+//   var avg = get_LL_avg(marginalize(LL, 'jointP'))
+//   print(utterance + ': ' + avg)
+// }, utterances)
 
+// var p = [0.6567614278301519,0.2598549243241947,0.05974491234864693,0.023638735497006517]
+// var cn = 'A ind. C'
+// var state = {utterance:'If A, C', sample:'',
+//              jointP:p, cn:cn}
+// displaySpeaker(bias, state)
 
-// var p = [0.37, 0.36, 0.032, 0.238]
-// var p = ''
-// displaySpeaker(utterance, qud, "", bias, p)
-
-var PL = listener(utterance, qud, bias)
+var PL = listener(utterance, bias)
 displayListener(PL, utterance, 'Pragmatic Listener', bias)
 
-// For R-script
+// ---For R-script---
 // var bias = myDF["bias"][0]
 // var utterance = myDF["utterance"][0]
-// var PL = listener(utterance, qud, bias)
+// var PL = listener(utterance, bias)
 // PL
+
+// var prior = sample(bayesNetPrior(bias))
+// var s = speaker(prior.jointP, prior.cn, bias)
+// var p = sort(mapIndexed(function(i,x){return [roundTo3(Math.exp(s.score(x))), i]},
+                        // s.support()), gt)
+// var maxps = p.slice(0,1)
+// var best = map(function(x){[s.support()[x[1]], x[0]]}, maxps)
+// var best = [s.support()[p[0][1]], prior.jointP, prior.cn]
+// best
