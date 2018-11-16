@@ -15,9 +15,9 @@ var dependentCA = ["C implies A", "C implies -A", "-C implies A", "-C implies -A
 var dependentNets = dependentAC.concat(dependentCA)
 var causalNets = independentNets.concat(dependentNets)
 
-var params = {'': {'p_ind': 1/3, 'beta0': 0},
+var params = {'': {'p_ind': 1/3, 'beta0': 0.1},
              'lawn-negotiable':{'p_ind':1/3, 'beta0':0},
-             'lawn-non-negotiable': {'p_ind': 1/6, 'beta0':0.9},
+             'lawn-non-negotiable': {'p_ind': 1/3, 'beta0':0},
              'pizza': {'p_ind': 1, 'beta0':1},
              'douven1': {'p_ind': 1/3, 'beta0': 0.5},
              'wason-abstract': {'p_ind': 1/3, 'beta0':0},
@@ -35,9 +35,19 @@ var params = {'': {'p_ind': 1/3, 'beta0': 0},
 //                'lawn-non-negotiable': {'p_ind': p, 'beta0': b},
 //                'douven1': {'p_ind': p, 'beta0': b}}
 /////////////////////////////////////////////
-var pvals = {t: 0.95, f: 0.05, m: 0.5, l: 0.7, ul: 0.3}
-var vals = [0.05, 0.3, 0.5, 0.7, 0.95]
-var vals2 = [0.1,0.2, 0.4, 0.6, 0.8]
+var roundTo3 = function(x){
+  return Math.round(x*1000)/1000
+}
+var midBins = function(granularity){
+  map(function(x) {roundTo3(x/granularity +
+                                        1/(2*granularity))},
+                  _.range(0,granularity))
+}
+// var pvals = {t: 0.95, f: 0.05, m: 0.5, l: 0.7, ul: 0.3}
+// var vals = [0.05, 0.3, 0.5, 0.7, 0.95]
+// var vals2 = [0.1,0.2, 0.4, 0.6, 0.8]
+var vals = midBins(5)
+var vals2 = midBins(15)
 // 1. samples for independent graphs
 // samples: P(A), P(C)
 var p_ind = function(vals){
@@ -50,8 +60,7 @@ var independentProbs1 = reduce(function(x, acc){
   return acc.concat(x);}, [], p_ind(vals));
 var independentProbs2 = reduce(function(x,acc){
   return acc.concat(x);}, [], p_ind(vals2));
-var independentProbs = independentProbs1.concat(independentProbs2)
-
+var indProbs = independentProbs1.concat(independentProbs2)
 // 2. samples for dependent graphs
 // samples: P(A),P(C|A),P(C|-A) or P(C), P(A|C), P(A|-C)
 var p_dep = map(function(x){
@@ -65,6 +74,12 @@ var ac = filter(function(x){return  x[1]>=thresholds.likely}, dependentProbs) //
 var anc = filter(function(x){return x[1]<=thresholds.unlikely}, dependentProbs) //cna
 var nac = filter(function(x){return x[2]>=thresholds.likely}, dependentProbs) //nca
 var nanc = filter(function(x){return x[2]<=thresholds.unlikely}, dependentProbs)//ncna
+
+var independentProbs = Infer({method:'forward', samples:4*ac.length,
+                              model:function(){
+    return [uniform({a:0, b: 1}), uniform({a:0, b: 1})]
+}}).support()
+
 // map(function(x){print(x.length)}, [ac,anc,nac,nanc, independentProbs])
 
 var probsPrior = function(cn){
@@ -83,9 +98,6 @@ var getCNpriors = function(p_ind){
 }
 var networkPrior = function(bias) {
   return categorical({vs: causalNets, ps: getCNpriors(params[bias].p_ind)})
-}
-var roundTo3 = function(x){
-  return Math.round(x*1000)/1000
 }
 ///////////////////////////////////////////
 var buildTable = function(probs, cn){
@@ -286,7 +298,7 @@ var displaySpeaker = function(bias, state){
   viz(speaker(state.jointP, state.cn, bias))
 }
 //-----SETUP VARIABLES-----//
-var utterance = "If A, -C"
+var utterance = "If A, C"
 // var utterance = ""
 
 var bias = ""
@@ -294,8 +306,8 @@ var bias = ""
 // var bias = "wason-concrete"
 // var bias = "pizza"
 // var bias = "lawn-negotiable"
-// var bias = "lawn-non-negotiable"
-var bias = "douven1"
+var bias = "lawn-non-negotiable"
+// var bias = "douven1"
 
 //-----MAKE PLOTS-----//
 display('speakerOptimality: ' + alpha)
