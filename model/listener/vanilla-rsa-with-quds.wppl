@@ -1,0 +1,339 @@
+////////////  SET PARAMETERS  /////////////////
+var alpha = 5
+var thresholds = {t: 0.9, f: 0.05, random: 0.5, unlikely: 0.3, likely: 0.7,
+                  meaning: 0.9}
+var ifUtts = ["If A, C", "If A, -C", "If -A, C", "If -A, -C",
+              "If C, A", "If C, -A", "If -C, A", "If -C, -A"]
+var simpleUtts = ["", "A", "C", "-A", "-C"]
+var probabilityUtts = ["likely A", "likely C", "likely -A", "likely -C"]
+var conjunctiveUtts = ["A and C", "C but -A", "A but -C", "neither A nor C"]
+//                       "A exor C", "Either both or none"]
+var utterances =
+    simpleUtts.concat(probabilityUtts).concat(conjunctiveUtts).concat(ifUtts)
+var independentNets = ["A ind. C"]
+var dependentAC = ["A implies C", "A implies -C", "-A implies C", "-A implies -C"]
+var dependentCA = ["C implies A", "C implies -A", "-C implies A", "-C implies -A"]
+var dependentNets = dependentAC.concat(dependentCA)
+var causalNets = independentNets.concat(dependentNets)
+
+var params = {'_p_ind': 0.625,
+             'lawn-negotiable_p_ind':0.625,
+             'lawn-non-negotiable_p_ind': 0.625,
+             'pizza_p_ind': 1,
+             'douven1_p_ind': 0.625,
+             'wason-abstract_p_ind': 0.625,
+             'wason-concrete_p_ind': 1/8}
+
+///////////// FOR R-SCRIPT /////////////
+// var p = myDF["p_ind"][0]
+// var p = Math.round(p*100)/100
+// var params = {'_p_ind': p,
+//              'lawn-negotiable_p_ind':p,
+//              'lawn-non-negotiable_p_ind': p,
+//              'pizza_p_ind': p,
+//              'douven1_p_ind': p,
+//              'wason-abstract_p_ind': p,
+//              'wason-concrete_p_ind': p}
+///////////// HELPERS /////////////
+var granularity =20
+var roundTo3 = function(x){
+  return Math.round(x*1000)/1000
+}
+var midBins = map(function(x) {roundTo3(x/granularity +
+                                        1/(2*granularity))},
+                  _.range(0,granularity))
+
+var DiscreteBeta = cache(function(a, b){
+  Infer({model: function(){
+    categorical({
+      vs:midBins,
+      ps:map(function(x){
+        Math.exp(Beta({a: a, b: b}).score(x))
+      }, midBins)
+    })
+  }})
+})
+// marginal probabilities
+var pa = function(x){return x[0]+x[2]}
+var pc = function(x){return x[0]+x[1]}
+var pna = function(x){return x[1]+x[3]}
+var pnc = function(x){return x[2]+x[3]}
+// conditional probabilities
+var pAgivenC = function(x){return x[0]/pc(x)}
+var pAgivenNC = function(x){return x[2]/pnc(x)}
+var pNAgivenC = function(x){return x[1]/pc(x)}
+var pNAgivenNC = function(x){return x[3]/pnc(x)}
+var pCgivenA = function(x){return x[0]/pa(x)}
+var pCgivenNA = function(x){return x[1]/pna(x)}
+
+///////////// PRIORS /////////////
+var tablesPrior = cache(function(){
+  return Infer({method:'enumerate',
+                model:function(){
+                  var table = map(function(){sample(DiscreteBeta(1,1))}, _.range(4))
+                  condition(sum(table) == 1)
+                  return table
+                }})
+})
+
+var tables = tablesPrior().support()
+// print('nb tables: ' + tables.length)
+// var nbIndependent = sum(map(function(table){
+//   roundTo3(pCgivenA(table)) === roundTo3(pCgivenNA(table))}, tables))
+// print('#ind: ' + nbIndependent)
+
+var logLikelihood = cache(function(table, cn){
+  var p = cn=="A implies C" ? pCgivenA(table) :
+  cn=='A implies -C' ? 1-pCgivenA(table)  :
+  cn=='-A implies C' ? pCgivenNA(table) :
+  cn=='-A implies -C' ? 1-pCgivenNA(table) :
+  cn=="C implies A"  ? pAgivenC(table):
+  cn=="C implies -A" ? 1-pAgivenC(table) :
+  cn=="-C implies A" ? pAgivenNC(table) :
+  cn=="-C implies -A" ? 1-pAgivenNC(table) :
+  cn=="A ind. C" ? (roundTo3(pCgivenA(table)) === roundTo3(pCgivenNA(table)) ?
+      0.999999 : 0.00000001) : error('unknown cn in likelihood: ' + cn)
+
+  var logL =  Beta({a:10, b:1}).score(p)
+  return logL
+})
+var getCNpriors = function(p_ind){
+  return [p_ind].concat(repeat(dependentNets.length,
+                               function(){(1-p_ind)/dependentNets.length}))
+}
+var networkPrior = function(bias) {
+  return categorical({vs: causalNets, ps: getCNpriors(params[bias+'_p_ind'])})
+}
+
+var bayesNetPrior = cache(function(bias){
+  return Infer({method:'enumerate', model:function(){
+    var table = uniformDraw(tables)
+    var cn = networkPrior(bias)
+    factor(logLikelihood(table, cn))
+
+    if(bias=='lawn-non-negotiable'){
+      if(pCgivenNA(table)<=thresholds.f){factor(-Math.log(thresholds.f))}
+    }else if(bias=='douven1'){
+      if(pc(table)>=thresholds.likely){factor(-Math.log(thresholds.f))}
+    }else if(bias=='lawn-negotiable'){
+      if(pCgivenNA(table)>=thresholds.unlikely &&
+         pCgivenNA(table)<=thresholds.likely){
+        factor(-Math.log(thresholds.f))
+      }
+    }
+    return {"cn": cn, "table": table}
+  }})
+})
+
+var qudPrior = Infer({method:'enumerate', model: function(){
+  return categorical({vs: ['bn', 'table', 'cn'], ps: [1,1,1]})}
+})
+
+///////////// MODEL /////////////
+var utteranceProbs = cache(function(utterance, table){
+  var p = utterance == "A" ? pa(table) :
+  utterance == "C" ? pc(table) :
+  utterance == "If A, C" ? table[0]/pa(table) :
+  utterance == "If C, A" ? table[0]/pc(table) :
+  utterance == "-A" ? pna(table) :
+  utterance == "-C" ? pnc(table) :
+  utterance == "If A, -C" ? table[2]/pa(table) :
+  utterance == "If -A, C" ? table[1] / pna(table) :
+  utterance == "If -A, -C" ? table[3] / pna(table) :
+  utterance == "If C, -A" ? table[1] / pc(table) :
+  utterance == "If -C, A" ? table[2] / pnc(table):
+  utterance == "If -C, -A" ? table[3] / pnc(table) :
+  utterance == "Either both or none" ? table[0]+table[3] :
+  utterance == "likely A" ? table[0] + table[2] :
+  utterance == "likely C" ? table[0] + table[1] :
+  utterance == "likely -A" ? table[1] + table[3] :
+  utterance == "likely -C" ? table[2] + table[3] :
+  utterance == "A exor C" ? table[1] + table[2] :
+  utterance == "A and C" ? table[0] :
+  utterance == "neither A nor C" ? table[3] :
+  utterance == "A but -C" ? table[2] :
+  utterance == "C but -A" ? table[1] :
+  utterance == "A or C" ? 1-table[3] :
+  utterance == "A or -C" ? 1-table[1] :
+  utterance == "-A or C" ? 1-table[2] :
+  utterance =="-A or -C" ? 1-table[0] :
+  utterance == "" ?
+    true : error("unknown utterance " + utterance)
+  return p
+})
+
+var meaning = cache(function(utterance, table, cn){
+ var p = utteranceProbs(utterance, table)
+ var p_holds = utterance.includes('likely') ?
+     (p > thresholds.random) : p > thresholds.meaning
+ return p_holds
+})
+
+var literalListener = cache(function(utterance, qud, bias){
+  Infer({method:'enumerate',model: function(){
+    var bn = sample(bayesNetPrior(bias))
+    condition(meaning(utterance, bn.table))
+    if(qud=='cn'){return bn.cn}
+    else if(qud == 'table'){return bn.table}
+    else{return bn}
+  }})
+}, 10000)
+
+var KL = cache(function(true_probability_input, approx_probability_input){
+  var true_probability = _.isArray(true_probability_input) ?
+     true_probability_input :
+     [true_probability_input, 1 - true_probability_input]
+  var approx_probability = _.isArray(approx_probability_input) ?
+     approx_probability_input :
+     [approx_probability_input, 1 - approx_probability_input]
+  sum(map(function(cell) {
+    if(true_probability[cell] == 0){0}
+    else if(approx_probability[cell]==0){error('undefined KL')}
+    else{
+      true_probability[cell] *
+       Math.log(true_probability[cell] / approx_probability[cell])
+    }}, _.range(true_probability.length)))
+}, 10000)
+
+var costs = function(utterance){
+  var cost = utterance == "" ? Math.log(0.00001) :
+  ifUtts.includes(utterance) ? Math.log(0.5) :
+  probabilityUtts.includes(utterance) ? Math.log(0.6) :
+  conjunctiveUtts.includes(utterance) ? Math.log(0.7) :
+  simpleUtts.includes(utterance) ? Math.log(0.8) :
+
+  error('costs: unknown utterance ' + utterance)
+  return cost
+}
+
+var speaker = cache(function(bn,bias,qud){
+  return Infer({method:'enumerate', model: function(){
+    var utterance = uniformDraw(utterances)
+    var LL = literalListener(utterance, qud, bias)
+    var utility = qud=='bn' ? LL.score(bn) : qud=='cn' ? LL.score(bn.cn) :
+    qud=='table' ? LL.score(bn.table) : error('unknown speaker qud: ' + qud)
+
+    factor(alpha * (utility + costs(utterance)))
+    return utterance
+  }
+ })
+}, 10000)
+
+var listener = function(utterance, bias){
+  return Infer({method:'enumerate', model:function(){
+                  var bn = sample(bayesNetPrior(bias))
+                  var qud = sample(qudPrior)
+                  observe(speaker(bn, bias, qud),utterance)
+                  return {qud: qud, bn: bn}
+                }})
+}
+
+//// VISUALIZATIONS ////
+var marginalizeDependentNets = function(listener){
+  return marginalize(listener, function(bn){
+    return{causalNets: dependentAC.includes(bn.cn) ? 'A implies C' :
+           dependentCA.includes(bn.cn) ? 'C implies A' : 'independent'}
+  })
+}
+
+var getEVs = function(listener, probFunc){
+  var listener_avg = sum(map(function(LLtable) {
+    Math.exp(listener.score(LLtable)) * probFunc(LLtable)
+  }, listener.support()))
+  return listener_avg
+}
+var evs = function(listener){
+  return {'C|A': getEVs(listener, pCgivenA),
+          'A|C': getEVs(listener, pAgivenC),
+          'C|-A': getEVs(listener, pCgivenNA),
+          'A|-C': getEVs(listener, pAgivenNC),
+          'A': getEVs(listener, pa),
+          'C': getEVs(listener, pc)}
+}
+
+var displayListener = function(listener, utterance, listenerType, bias){
+  display([listenerType, utterance, bias].join(" %% "))
+  viz(marginalize(listener, function(bn){return{causalNet: bn.cn}}))
+  viz(marginalizeDependentNets(listener))
+  var listenerProbs = marginalize(listener, function(bn){return bn.table})
+  print(evs(listenerProbs))
+  var pa = Infer({method:'forward', samples: 1000, model: function(){
+    var bn = sample(listener)
+    return pa(bn.table)}})
+  var pc = Infer({method:'forward', samples: 1000, model: function(){
+    var bn = sample(listener)
+    return pc(bn.table)}})
+  var std_pa = listStdev(pa.support());
+  var std_pc = listStdev(pc.support());
+  print('sigma_pa: ' + std_pa + ' sigma_pc: ' + std_pc)
+  //   viz.table(listener, {groupBy:'table'})
+}
+
+var displaySpeaker = function(bias, state){
+  display(bias ? 'bias: '.concat(bias) : 'no bias')
+  var qud = state.qud
+  display('qud: ' + qud)
+  var state = state.sample=='LL' ?
+      sample(literalListener(state.utterance, "bn", bias)) : (state.sample=='prior' ?
+  sample(bayesNetPrior(bias)) : state)
+  print('speaker p: ' + state.table)
+  print('speaker cn: ' + state.cn)
+  var bn = {"cn": state.cn, "table": state.table}
+  viz(speaker(bn, bias, qud))
+}
+//-----SETUP VARIABLES-----//
+var utterance = "If A, C"
+// var utterance = ""
+
+var bias = ""
+// var bias = "wason-abstract"
+// var bias = "wason-concrete"
+// var bias = "pizza"
+// var bias = "lawn-negotiable"
+// var bias = "lawn-non-negotiable"
+// var bias = "douven1"
+
+//-----MAKE PLOTS-----//
+display('speakerOptimality: ' + alpha)
+
+// var prior = bayesNetPrior(bias)
+// viz(prior, {groupBy: 'cn'})
+// viz.table(prior)
+// displayListener(prior, '', 'Bayes Net Prior', bias)
+// var independent_bns = filter(function(bn){bn.cn=='A implies C'}, prior.support())
+// viz.table(independent_bns)
+// var pcs = map(function(bn){return pc(bn.table)}, independent_bns)
+// var pcas = map(function(bn){return pCgivenA(bn.table)}, independent_bns)
+// viz.scatter(pcs,pcas)
+
+
+// var LL = literalListener(utterance, 'bn', bias)
+// displayListener(LL, utterance, 'LL', bias)
+// var z = map(function(utterance){
+//   print(utterance)
+//   var LL = literalListener(utterance, 'bn', bias)
+//   displayListener(LL, utterance, 'LL', bias)
+// }, utterances)
+
+// var state = {utterance:'If A, C', sample:'prior', qud:'bn'}
+// displaySpeaker(bias, state)
+
+var PL = listener(utterance, bias)
+var PLbn = marginalize(PL, function(s){return s['bn']})
+viz(marginalize(PL, function(s){return s['qud']}))
+displayListener(PLbn, utterance, 'Pragmatic Listener', bias)
+
+// ---For R-script---
+// var bias = myDF["bias"][0]
+// var utterance = myDF["utterance"][0]
+// var PL = listener(utterance, bias)
+// PL
+
+// var prior = sample(bayesNetPrior(bias))
+// var s = speaker(prior, bias)
+// var p = sort(mapIndexed(function(i,x){return [roundTo3(Math.exp(s.score(x))), i]},
+                        // s.support()), gt)
+// var maxps = p.slice(0,1)
+// var best = map(function(x){[s.support()[x[1]], x[0]]}, maxps)
+// var best = [s.support()[p[0][1]], prior.table, prior.cn]
+// best
