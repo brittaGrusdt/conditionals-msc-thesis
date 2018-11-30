@@ -3,22 +3,28 @@ library(purrr)
 library(dplyr)
 ####################
 
-buildDF_from_samples <- function(listener){
+buildDF_from_samples <- function(listener, withQUD=TRUE){
   df <- data.frame(matrix(ncol = 3, nrow = length(listener$Parameter=='bn.table')))
   colnames(df) <- c("bn.table", "BN")
   df$bn.table = listener$value[listener$Parameter=='bn.table']
   df$bn.cn = listener$value[listener$Parameter=='bn.cn']
-  df$qud = listener$value[listener$Parameter=='qud']
+  if(withQUD){
+    df$qud = listener$value[listener$Parameter=='qud']
+  }
   df$prob = rep(1/length(df$bn.table), length(df$bn.table))
   return(df)
 }
 
-buildDF_from_enumerate <- function(listener){
+buildDF_from_enumerate <- function(listener, withQUD=TRUE){
   df <- data.frame(matrix(ncol = 4, nrow = length(listener$bn.table)))
   colnames(df) <- c("bn.table", "bn.cn", "qud", "prob")
-  df$bn.table = listener$bn.table
-  df$bn.cn = listener$bn.cn
-  df$qud = listener$qud
+  df$bn.table <- listener$bn.table
+  df$bn.cn <- listener$bn.cn
+  if(withQUD){
+    df$qud <- listener$qud
+  }else{
+    df$qud <- rep("-", length(listener$bn.table))
+  }
   df$prob = listener$prob
   return(df)
 }
