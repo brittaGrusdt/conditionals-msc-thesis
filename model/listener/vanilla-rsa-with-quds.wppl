@@ -193,16 +193,19 @@ var speakerExpectation = function(n, qud, bias, utterance){
 var bias = myDF["bias"][0]
 var utterance = myDF["utterance"][0]
 display('bias: ' + bias + ' utterance: ' + utterance)
+
 // 1. joint distributions (run-across-biases.r)
 // var PL = listener(utterance, bias)
 // PL
 
+var LL = literalListener(utterance, "bn", bias)
+LL
 
 // 2. speaker suprisal (speaker-expectations.r)
-var qud = myDF["qud"][0]
-display(qud)
-var se = speakerExpectation(1000,qud, bias, utterance)
-se
+// var qud = myDF["qud"][0]
+// display(qud)
+// var se = speakerExpectation(1000,qud, bias, utterance)
+// se
 
 //3. conditional distributions
 // var cn = myDF["cn"][0]
