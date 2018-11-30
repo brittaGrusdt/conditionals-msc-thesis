@@ -16,7 +16,7 @@ def getData(fn_joint, fn_marginal):
     return joint, marginal
 
 
-def tablePlots(fn_j, fn_m):
+def tablePlots(fn_j, fn_m, listener):
     joint, marginal = getData(fn_j, fn_m)
 
     for k, bias in BIAS.items():
@@ -65,10 +65,15 @@ def tablePlots(fn_j, fn_m):
 
         fig.suptitle("Bias: " + bias)
         fig.subplots_adjust(hspace=0.4, wspace=0.2)
-        plt.savefig(bias + '.png')
+        plt.savefig(bias + '-' + listener + '.png')
 
 if __name__ == '__main__':
 
-    fn_joint = '/home/britta/UNI/Masterarbeit/conditionals/rwebppl/evs-joint.csv'
-    fn_marginal = '/home/britta/UNI/Masterarbeit/conditionals/rwebppl/evs-marginal.csv'
-    tablePlots(fn_joint, fn_marginal)
+    listener = "LL" # PL or LL
+
+    fn_joint = './../rwebppl/results-' + listener + '-3-runs-each-bias/evs-joint.csv'
+    fn_marginal = './../rwebppl/results-' + listener + '-3-runs-each-bias/evs-marginal.csv'
+
+    tablePlots(fn_joint, fn_marginal, listener)
+
+
