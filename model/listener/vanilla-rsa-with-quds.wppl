@@ -206,16 +206,3 @@ LL
 // display(qud)
 // var se = speakerExpectation(1000,qud, bias, utterance)
 // se
-
-//3. conditional distributions
-// var cn = myDF["cn"][0]
-// display(cn)
-
-// var PL = listener(utterance, bias)
-// var conditionalDistr = Infer(model:function(){
-//     var state = sample(PL)
-//     condition(state['bn'].cn== cn)
-//     return state
-//   })
-// conditionalDistr
-
