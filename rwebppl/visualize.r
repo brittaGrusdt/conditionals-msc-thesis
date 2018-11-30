@@ -26,16 +26,30 @@ visualizeR <- function(df, utterance){
         main=paste("Pragmatic Listener hears: ",utterance, sep=""))
 }
 
-visualizeCNs <- function(listener, infType, listenerType){
-  if(infType=='samples'){
-      df <- buildDF_from_samples(listener)
-  }else{
-    df <- buildDF_from_enumerate(listener)
-  }
-  qplot(x = factor(unlist(df$cn)), data = df,
-        xlab="causal nets", ylab="frequency")
+visualizeCNs <- function(evs, bias){
+  # One barplot command to get histogram of x
+  jpeg(paste(bias,".jpeg", sep=""), width = 480, height=480)
+  indices <- as.logical(evs)
+  par(oma = c( 5, 0, 3, 0))
+  y <- as.numeric(round(x=evs[indices], digits=2))
+  graph <- barplot(height = y,
+          names.arg = names(evs)[indices],
+          las = 2,
+          width = rep(0.1, sum(indices)),
+          xlim = c(0, 1),
+          ylim = c(0, 1),
+          col=c("darkblue"),
+          main = bias)
+  text(graph, y=y+0.75, labels=y)
+  dev.off()
 }
 
+saveResults <- function(results, bias, n_runs){
+  pdf(paste(bias, "-", n_runs, "-runs", sep=""))
+  grid.newpage()
+  grid.table(t(results))
+  dev.off()
+} 
 
 #### Visualization with webppl
 disp <- "viz(myDF)"
