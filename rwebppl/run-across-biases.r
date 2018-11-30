@@ -1,11 +1,11 @@
+source("constants.r")
 source("running-functions.r")
 source("visualize.r")
 require("grid")
 require("gridExtra")
 # ----------------- #
 # Parameters #### 
-baseDir <- "/home/britta/UNI/Masterarbeit/conditionals/model/listener/"
-model_path <- paste(baseDir, "vanilla-rsa-with-quds.wppl", sep="")
+model_path <- paste(BASEDIR, "vanilla-rsa-with-quds.wppl", sep="")
 
 # parameters for processing in R:
 inferenceType <- "enumerate"
@@ -14,10 +14,8 @@ savePlots <- TRUE
 
 listenerTypes <- c("none", "lawn-nn", "pizza", "douven1")
 n_runs <- 3
-seeds <- c(8546340, 6538185, 5230322)
 
 ##### webppl loop ####
-
 all_results <- data.frame(matrix(ncol=22))
 all_ev_joints <- array(dim=c(9,4,length(listenerTypes)))
 n_iter <- 0
@@ -33,7 +31,7 @@ for (lt in listenerTypes) {
     }
     # parameters for webppl program:
     data <- list(bias=lt, utterance=utt)
-    listener <- posterior_with_data_input(model_path, data, viz, seeds[i])
+    listener <- posterior_with_data_input(model_path, data, viz, SEEDS[i])
     
     if(inferenceType == "samples"){
       listener_df <- buildDF_from_samples(listener)

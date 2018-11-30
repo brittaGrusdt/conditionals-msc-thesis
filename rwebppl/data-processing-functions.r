@@ -1,10 +1,7 @@
+source("constants.r")
 library(purrr)
 library(dplyr)
 ####################
-CNs <- c('A implies C', 'A implies -C', '-A implies C', '-A implies -C',
-         'C implies A', 'C implies -A', '-C implies A','-C implies -A', 
-         'A ind. C')
-
 
 buildDF_from_samples <- function(listener){
   df <- data.frame(matrix(ncol = 3, nrow = length(listener$Parameter=='bn.table')))
