@@ -6,7 +6,7 @@ library("gplots")
 ##### constants #####
 model <- paste(BASEDIR, "vanilla-rsa-with-quds.wppl", sep="")
 bias <- "douven1"
-qud <- "bn"
+qud <- "table"
 
 simpleUtts <- c("null", "A", "C", "-A", "-C")
 probUtts <- c("likely A", "likely C", "likely -A", "likely -C")
@@ -60,21 +60,25 @@ probs <- all_results[which(all_results$utterance %in% probUtts), ]
 ifacs <- all_results[which(all_results$utterance %in% ifacUtts), ]
 ifcas <- all_results[which(all_results$utterance %in% ifcaUtts), ]
 
-dfList <- list(simples) #, conjs, probs, ifacs, ifcas)
-names <- list(c("simple", "conjunctions", "likely", "ifac", "ifca"))
+dfList <- list(simples, conjs, probs, ifacs, ifcas)
+names <- c("simple", "conjunctions", "likely", "ifac", "ifca")
 plotM <- function(df, name){
-  jpeg(paste(bias, "-qud-", qud, "-", name, ".jpeg", sep=""), width = 480, height=480)
+  fn <- paste(bias, "-qud-", qud, "-", name, ".jpeg", sep="")
+  print(fn)
+  jpeg(fn, width = 480, height=480)
   plotmeans(pspeaker ~ utterance, data = df,
           xlab = "utterances", ylab = ylabel,
           n.label=FALSE,
+          ylim = c(0,0.3),
           main="Expectation Speaker (95% CI)") 
   dev.off()
 }
 
-mapply(plotM, dfList, names)
+for(i in 1:length(dfList)){
+  plotM(dfList[[i]], names[i])
+}
 
-
-
+saveRDS(dfList, paste("speakerExpectations-", bias, "-qud-", qud,".rds", sep=""))
 
 
 
