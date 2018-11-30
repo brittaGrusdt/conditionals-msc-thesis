@@ -4,10 +4,9 @@ library("ggpubr")
 library("gplots")
 
 ##### constants #####
-baseDir <- "/home/britta/UNI/Masterarbeit/conditionals/model/listener/"
-model <- paste(baseDir, "vanilla-rsa-with-quds.wppl", sep="")
-nsamples <- 1000
+model <- paste(BASEDIR, "vanilla-rsa-with-quds.wppl", sep="")
 bias <- "douven1"
+qud <- "bn"
 
 simpleUtts <- c("null", "A", "C", "-A", "-C")
 probUtts <- c("likely A", "likely C", "likely -A", "likely -C")
@@ -29,8 +28,8 @@ buildDF <- function(samples, utterance){
 ##### get samples from webppl program #####
 all_results <- data.frame(utterance= numeric(0), pspeaker= numeric(0))
 for (utt in utterances){
-  data <- list(bias=bias, utterance=utt)
-  likelihoods <- posterior_with_data_input(model, data, viz=FALSE)
+  data <- list(bias=bias, utterance=utt, qud=qud)
+  likelihoods <- posterior_with_data_input(model, data, viz=FALSE, seed=SEEDS[1])
   
   result <- buildDF(likelihoods, utt)
   all_results <- rbind(all_results, result)
@@ -61,13 +60,16 @@ probs <- all_results[which(all_results$utterance %in% probUtts), ]
 ifacs <- all_results[which(all_results$utterance %in% ifacUtts), ]
 ifcas <- all_results[which(all_results$utterance %in% ifcaUtts), ]
 
-dfList <- list(simples, conjs, probs, ifacs, ifcas)
+dfList <- list(simples) #, conjs, probs, ifacs, ifcas)
 plotM <- function(df){
+  jpeg(paste(bias, "-qud-", qud, ".jpeg", sep=""), width = 480, height=480)
   plotmeans(pspeaker ~ utterance, data = df,
           xlab = "utterances", ylab = ylabel,
           n.label=FALSE,
           main="Expectation Speaker (95% CI)") 
+  dev.off()
 }
+
 lapply(dfList, plotM)
 
 
