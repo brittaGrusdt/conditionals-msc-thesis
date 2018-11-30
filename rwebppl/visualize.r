@@ -26,9 +26,9 @@ visualizeR <- function(df, utterance){
         main=paste("Pragmatic Listener hears: ",utterance, sep=""))
 }
 
-visualizeCNs <- function(evs, bias){
+visualizeAsBarPlot <- function(evs, bias, kind){
   # One barplot command to get histogram of x
-  jpeg(paste(bias,".jpeg", sep=""), width = 480, height=480)
+  jpeg(paste(bias, "-", kind, ".jpeg", sep=""), width = 480, height=480)
   indices <- as.logical(evs)
   par(oma = c( 5, 0, 3, 0))
   y <- as.numeric(round(x=evs[indices], digits=2))

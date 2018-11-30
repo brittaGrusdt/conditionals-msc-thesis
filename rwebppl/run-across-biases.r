@@ -51,7 +51,10 @@ for (lt in listenerTypes) {
 
   if(savePlots){
     cnData <- sapply(CNs, function(x){return(avgs[[x,1]])})
-    visualizeCNs(cnData, lt)
+    visualizeAsBarPlot(cnData, lt, "cns")
+    
+    qudData <- sapply(QUDs, function(x){return(avgs[[paste("qud_", x, sep=""), 1]])})
+    visualizeAsBarPlot(qudData, lt, "quds")
   }
 
   # average of expected vals for tables based on cns
@@ -67,3 +70,8 @@ rownames(all_ev_joints) <- rownames(summed_ev_joint)
 
 write.csv(all_results, file='evs-marginal.csv')
 write.csv(all_ev_joints, file='evs-joint.csv')
+
+saveRDS(all_results, paste("evs-marginal.rds", sep=""))
+saveRDS(all_ev_joints, paste("evs-joint.rds", sep=""))
+
+
