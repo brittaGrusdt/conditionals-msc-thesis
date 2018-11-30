@@ -8,6 +8,7 @@ require("gridExtra")
 model_path <- paste(BASEDIR, "vanilla-rsa-with-quds.wppl", sep="")
 
 # parameters for processing in R:
+withQUD <- FALSE # (depens on LL/PL)
 inferenceType <- "enumerate"
 viz <- FALSE
 savePlots <- TRUE
@@ -16,7 +17,11 @@ listenerTypes <- c("none", "lawn-nn", "pizza", "douven1")
 n_runs <- 3
 
 ##### webppl loop ####
-all_results <- data.frame(matrix(ncol=22))
+if(withQUD){
+  all_results <- data.frame(matrix(ncol=22))
+}else{
+  all_results <- data.frame(matrix(ncol=19))
+}
 all_ev_joints <- array(dim=c(9,4,length(listenerTypes)))
 n_iter <- 0
 for (lt in listenerTypes) {
@@ -32,13 +37,19 @@ for (lt in listenerTypes) {
     # parameters for webppl program:
     data <- list(bias=lt, utterance=utt)
     listener <- posterior_with_data_input(model_path, data, viz, SEEDS[i])
+    if(!withQUD){
+      c <- colnames(listener)
+      c[c=="cn"] <- "bn.cn"
+      c[c=="table"] <- "bn.table"
+      colnames(listener) <- c
+    }
     
     if(inferenceType == "samples"){
-      listener_df <- buildDF_from_samples(listener)
+      listener_df <- buildDF_from_samples(listener, withQUD)
     }else{
-      listener_df <- buildDF_from_enumerate(listener)
+      listener_df <- buildDF_from_enumerate(listener, withQUD)
     }
-    res <- getEVs(listener_df, lt)
+    res <- getEVs(listener_df, lt, withQUD)
     results <- rbind(results, res)
     
     EV_probs_cns <- jointEVs(listener_df)
@@ -53,8 +64,10 @@ for (lt in listenerTypes) {
     cnData <- sapply(CNs, function(x){return(avgs[[x,1]])})
     visualizeAsBarPlot(cnData, lt, "cns")
     
-    qudData <- sapply(QUDs, function(x){return(avgs[[paste("qud_", x, sep=""), 1]])})
-    visualizeAsBarPlot(qudData, lt, "quds")
+    if(withQUD){
+      qudData <- sapply(QUDs, function(x){return(avgs[[paste("qud_", x, sep=""), 1]])})
+      visualizeAsBarPlot(qudData, lt, "quds")
+    }
   }
 
   # average of expected vals for tables based on cns
