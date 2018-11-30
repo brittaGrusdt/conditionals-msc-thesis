@@ -179,7 +179,7 @@ var listener = function(utterance, bias, speakerIntent){
 }
 
 //-----MAKE PLOTS-----//
-var speakerSurprisal = function(n, qud, bias, utterance){
+var speakerExpectation = function(n, qud, bias, utterance){
   var bnsFromPrior = repeat(n, function(){return sample(bayesNetPrior(bias))})
   var likelihoods = map(function(bn){
     var speakerBeliefs = speaker(bn, bias, qud)
@@ -189,20 +189,20 @@ var speakerSurprisal = function(n, qud, bias, utterance){
   return likelihoods
 }
 
-// ---For R-script---
+// ---For R-scripts---
 var bias = myDF["bias"][0]
 var utterance = myDF["utterance"][0]
 display('bias: ' + bias + ' utterance: ' + utterance)
-// 1. joint distributions
-var PL = listener(utterance, bias)
-PL
+// 1. joint distributions (run-across-biases.r)
+// var PL = listener(utterance, bias)
+// PL
 
 
-// 2. speaker suprisal
-// var qud = myDF["qud"][0]
-// display(qud)
-// speakerSurprisal(10000,qud, bias, utterance)
-
+// 2. speaker suprisal (speaker-expectations.r)
+var qud = myDF["qud"][0]
+display(qud)
+var se = speakerExpectation(1000,qud, bias, utterance)
+se
 
 //3. conditional distributions
 // var cn = myDF["cn"][0]
