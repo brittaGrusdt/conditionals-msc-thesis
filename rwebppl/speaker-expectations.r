@@ -61,8 +61,9 @@ ifacs <- all_results[which(all_results$utterance %in% ifacUtts), ]
 ifcas <- all_results[which(all_results$utterance %in% ifcaUtts), ]
 
 dfList <- list(simples) #, conjs, probs, ifacs, ifcas)
-plotM <- function(df){
-  jpeg(paste(bias, "-qud-", qud, ".jpeg", sep=""), width = 480, height=480)
+names <- list(c("simple", "conjunctions", "likely", "ifac", "ifca"))
+plotM <- function(df, name){
+  jpeg(paste(bias, "-qud-", qud, "-", name, ".jpeg", sep=""), width = 480, height=480)
   plotmeans(pspeaker ~ utterance, data = df,
           xlab = "utterances", ylab = ylabel,
           n.label=FALSE,
@@ -70,7 +71,7 @@ plotM <- function(df){
   dev.off()
 }
 
-lapply(dfList, plotM)
+mapply(plotM, dfList, names)
 
 
 
