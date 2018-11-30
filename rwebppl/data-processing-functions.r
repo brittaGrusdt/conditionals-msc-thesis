@@ -121,13 +121,14 @@ jointEVs <- function(listener_df){
     
     cns <- listener_df$bn.cn
     indices <- cns == cn
-    EVs$p_CA <- round(x=sum(probVals$pca[indices] * ps[indices]),
+    pcn <- sum(ps[indices])
+    EVs$p_CA <- round(x=sum(probVals$pca[indices] * (ps[indices]/pcn)),
                       digits=3)
-    EVs$p_CNA <- round(x=sum(probVals$pcna[indices]* ps[indices]),
+    EVs$p_CNA <- round(x=sum(probVals$pcna[indices]* (ps[indices]/pcn)),
                        digits=3)
-    EVs$p_NCA <- round(x=sum(probVals$pnca[indices]* ps[indices]),
+    EVs$p_NCA <- round(x=sum(probVals$pnca[indices]* (ps[indices]/pcn)),
                        digits=3)
-    EVs$p_NCNA <- round(x=sum(probVals$pncna[indices]* ps[indices]),
+    EVs$p_NCNA <- round(x=sum(probVals$pncna[indices]* (ps[indices]/pcn)),
                         digits=3)
     all_results[iter,] <- EVs
   }
