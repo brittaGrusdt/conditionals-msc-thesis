@@ -72,7 +72,7 @@ marginalEVQuds <- function(listener_df){
   df <- data.frame(matrix(ncol=3, nrow=1))
   colnames(df) <- c("qud_bn", "qud_cn", "qud_table")
   iter <- 0
-  for(qud in c("bn", "cn", "table")){
+  for(qud in QUDs){
     iter <- iter + 1
     quds <- listener_df$qud
     quds[quds!=qud] <- 0
