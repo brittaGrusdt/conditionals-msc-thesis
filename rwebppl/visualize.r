@@ -37,10 +37,10 @@ visualizeCNs <- function(evs, bias){
           las = 2,
           width = rep(0.1, sum(indices)),
           xlim = c(0, 1),
-          ylim = c(0, 1),
+          ylim = c(0, 1.1),
           col=c("darkblue"),
           main = bias)
-  text(graph, y=y+0.75, labels=y)
+  text(graph, y=y+0.05, labels=y)
   dev.off()
 }
 
