@@ -2,7 +2,7 @@
 var alpha = 5
 var thresholds = {t: 0.9, f: 0.05, likely: 0.7, theta: 0.9, theta_likely: 0.6}
 var utteranceDict = {"null": ["null"],
-                     'simple': ["A", "C", "-A", "-C"],
+                     'literals': ["A", "C", "-A", "-C"],
                      'probs' : ["likely A", "likely C", "likely -A", "likely -C"],
                      'conj' : ["A and C", "C but -A", "A but -C", "neither A nor C"],
                      'if' : ["If A, C", "If A, -C", "If -A, C", "If -A, -C",
@@ -40,13 +40,10 @@ var pCgivenNA = function(x){return x[1]/pna(x)}
 
 ///////////// PRIORS /////////////
 var tablesPrior = mem(function(){
-  return Infer({method:'rejection', samples:5000, model:function(){
-    var x1 = sample(Uniform({a:0,b:1}));
-    var x2 = sample(Uniform({a:0,b:1}));
-    var x3 = sample(Uniform({a:0,b:1}));
-    condition(x1+x2+x3<1)
-    var x4 = 1-(roundTo3(x1+x2+x3))
-    return [x1,x2,x3,x4]
+  return Infer({method:'forward', samples:5000, model:function(){
+    var alpha = Vector(repeat(4, constF(0.25)));
+    var table = dirichlet({alpha})
+    return table
 }})})
 
 var tables = tablesPrior().support()
@@ -98,7 +95,7 @@ var bayesNetPrior = cache(function(bias){
 })
 
 var qudPrior = Infer({method:'enumerate', model: function(){
-  return categorical({vs: ['bn', 'table', 'cn'], ps: [1,1, 1]})}
+  return categorical({vs: ['bn', 'table'], ps: [1,1]})}
 })
 
 ///////////// MODEL /////////////
@@ -150,7 +147,7 @@ var costs = function(utterance){
   utteranceDict['if'].includes(utterance) ?  0.75:
   utteranceDict['conj'].includes(utterance) ? 0.5 :
   utteranceDict['probs'].includes(utterance) ? 0.25 :
-  utteranceDict['simple'].includes(utterance) ? 0 :
+  utteranceDict['literals'].includes(utterance) ? 0 :
 
   error('costs: unknown utterance ' + utterance)
   return cost
