@@ -69,7 +69,7 @@ def tablePlots(fn_j, fn_m, listener):
 
 if __name__ == '__main__':
 
-    listener = "LL" # PL or LL
+    listener = "PL" # PL or LL
 
     fn_joint = './../rwebppl/results-' + listener + '-3-runs-each-bias/evs-joint.csv'
     fn_marginal = './../rwebppl/results-' + listener + '-3-runs-each-bias/evs-marginal.csv'
