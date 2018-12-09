@@ -1,15 +1,19 @@
 ////////////  SET PARAMETERS  /////////////////
 var alpha = 5
-var thresholds = {t: 0.9, f: 0.05, likely: 0.7, theta: 0.9, theta_likely: 0.6}
-var utteranceDict = {"null": ["null"],
-                     'literals': ["A", "C", "-A", "-C"],
-                     'probs' : ["likely A", "likely C", "likely -A", "likely -C"],
+var thresholds = {t: 0.9, f: 0.05, likely: 0.7, theta: 0.9, theta_maybe: 0.5}
+var literals = ["A", "C", "-A", "-C"]
+var conditionals = ["If A, C", "If A, -C", "If -A, C", "If -A, -C",
+                    "If C, A", "If C, -A", "If -C, A", "If -C, -A"]
+var maybe = map(function(u){return "maybe ".concat(u)},
+                literals)
+
+var utteranceDict = {'literals': literals,
+                     'if' : conditionals,
+                     'maybe': maybe,
                      'conj' : ["A and C", "C but -A", "A but -C", "neither A nor C"],
-                     'if' : ["If A, C", "If A, -C", "If -A, C", "If -A, -C",
-                             "If C, A", "If C, -A", "If -C, A", "If -C, -A"]}
+                    }
 var utterances = reduce(function(utts,acc){acc.concat(utts)},[],
                         Object.values(utteranceDict))
-
 var independentNets = ["A ind. C"]
 var dependentAC = ["A implies C", "A implies -C", "-A implies C", "-A implies -C"]
 var dependentCA = ["C implies A", "C implies -A", "-C implies A", "-C implies -A"]
@@ -42,7 +46,8 @@ var pCgivenNA = function(x){return x[1]/pna(x)}
 var tablesPrior = mem(function(){
   return Infer({method:'forward', samples:5000, model:function(){
     var alpha = Vector(repeat(4, constF(0.25)));
-    var table = dirichlet({alpha})
+    var vec = dirichlet({alpha})
+    var table = Object.values(vec.data)
     return table
 }})})
 
@@ -100,35 +105,30 @@ var qudPrior = Infer({method:'enumerate', model: function(){
 
 ///////////// MODEL /////////////
 var utteranceProbs = cache(function(utterance, table){
-  var p = utterance == "A" ? pa(table) :
-  utterance == "C" ? pc(table) :
+  var p =
+  utterance == "A" || utterance == 'maybe A' ? pa(table) :
+  utterance == "C" || utterance == 'maybe C'? pc(table) :
+  utterance == "-A" || utterance == 'maybe -A' ? pna(table) :
+  utterance == "-C" || utterance == 'maybe -C' ? pnc(table) :
   utterance == "If A, C" ? table[0]/pa(table) :
-  utterance == "If C, A" ? table[0]/pc(table) :
-  utterance == "-A" ? pna(table) :
-  utterance == "-C" ? pnc(table) :
   utterance == "If A, -C" ? table[2]/pa(table) :
   utterance == "If -A, C" ? table[1] / pna(table) :
   utterance == "If -A, -C" ? table[3] / pna(table) :
+  utterance == "If C, A" ? table[0]/pc(table) :
   utterance == "If C, -A" ? table[1] / pc(table) :
   utterance == "If -C, A" ? table[2] / pnc(table):
   utterance == "If -C, -A" ? table[3] / pnc(table) :
-  utterance == "likely A" ? table[0] + table[2] :
-  utterance == "likely C" ? table[0] + table[1] :
-  utterance == "likely -A" ? table[1] + table[3] :
-  utterance == "likely -C" ? table[2] + table[3] :
   utterance == "A and C" ? table[0] :
   utterance == "neither A nor C" ? table[3] :
   utterance == "A but -C" ? table[2] :
-  utterance == "C but -A" ? table[1] :
-  utterance == "null" ?
-    true : error("unknown utterance " + utterance)
+  utterance == "C but -A" ? table[1] : error("unknown utterance " + utterance)
   return p
 })
 
 var meaning = cache(function(utterance, table, cn){
  var p = utteranceProbs(utterance, table)
- var p_holds = utterance.includes('likely') ?
-     (p >= thresholds.theta_likely) : p >= thresholds.theta
+ var p_holds = utterance.includes('maybe') ?
+     (p >= thresholds.theta_maybe) : p >= thresholds.theta
  return p_holds
 })
 
@@ -142,24 +142,27 @@ var literalListener = cache(function(utterance, qud, bias){
   }})
 }, 10000)
 
-var costs = function(utterance){
-  var cost = utterance == "null" ? 20 :
-  utteranceDict['if'].includes(utterance) ?  0.75:
-  utteranceDict['conj'].includes(utterance) ? 0.5 :
-  utteranceDict['probs'].includes(utterance) ? 0.25 :
-  utteranceDict['literals'].includes(utterance) ? 0 :
+var costs = function(utt){
+  if(!utterances.includes(utt)){error('unknown utterance ' + utt)}
+  var c1 = utt.includes('If') ? 0.55 : 0
+  var c2 = utt.includes('and') || utt.includes('but') ? 0.25 : 0
+  var c3 = utt.includes('not A') ? 0.125 : 0
+  var c4 = utt.includes('not C') ? 0.125 : 0
+  var c5 = utt.includes('maybe') ? 0.1 : 0
+  var cost = c1 + c2 + c3 + c4 + c5
 
-  error('costs: unknown utterance ' + utterance)
   return cost
 }
 
-var speaker = cache(function(bn, bias, qud){
+var speaker = cache(function(bn, bias, qud, printU){
   return Infer({method:'enumerate', model: function(){
     var utterance = uniformDraw(utterances)
     var LL = literalListener(utterance, qud, bias)
     var utility = qud=='bn' ? LL.score(bn) : qud=='cn' ? LL.score(bn.cn) :
     qud=='table' ? LL.score(bn.table) : error('unknown speaker qud: ' + qud)
-//     print(utterance + utility)
+    if(printU){
+      print(utterance + utility)
+    }
     factor(alpha * (utility - costs(utterance)))
     return utterance
   }
@@ -170,12 +173,10 @@ var listener = function(utterance, bias, speakerIntent){
   return Infer({method:'enumerate', model:function(){
                   var bn = sample(bayesNetPrior(bias))
                   var qud = speakerIntent ? speakerIntent: sample(qudPrior)
-                  observe(speaker(bn, bias, qud),utterance)
+                  observe(speaker(bn, bias, qud, false),utterance)
                   return {qud: qud, bn: bn}
                 }})
 }
-
-//-----MAKE PLOTS-----//
 var speakerExpectation = function(n, qud, bias, utterance){
   var bnsFromPrior = repeat(n, function(){return sample(bayesNetPrior(bias))})
   var likelihoods = map(function(bn){
