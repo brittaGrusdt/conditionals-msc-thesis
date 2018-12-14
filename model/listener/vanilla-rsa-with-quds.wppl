@@ -21,10 +21,11 @@ var dependentNets = dependentAC.concat(dependentCA)
 var causalNets = independentNets.concat(dependentNets)
 
 var params = {'none_p_ind': 1/3,
-             'lawn-nn_p_ind': 1/3,
+             'lawn_p_ind': 1/3,
              'pizza_p_ind': 1,
              'douven1_p_ind': 0.9,
-             'wason-abstract_p_ind': 1/8}
+             'wason-abstract_p_ind': 1/8,
+             'amherst_p_ind': 1/3}
 
 var roundTo3 = function(x){
   return Math.round(x*1000)/1000
@@ -89,11 +90,13 @@ var bayesNetPrior = cache(function(bias){
     var table = uniformDraw(tables)
     var cn = networkPrior(bias)
     factor(logLikelihood(table, cn))
-    if(bias=='lawn-nn'){
-      if(pCgivenNA(table)<=1-thresholds.likely){factor(-Math.log(thresholds.f))}
-    }
-    else if(bias=='douven1'){
+    if(bias=='lawn'){
+      // if(pCgivenNA(table)<=1-thresholds.likely){factor(-Math.log(thresholds.f))}
+      if(table[1]<=thresholds.f){factor(-Math.log(thresholds.f))}
+    }else if(bias=='douven1'){
       if(pc(table)>=thresholds.likely){factor(-Math.log(thresholds.f))}
+    }else if(bias=='amherst'){
+      if(pa(table)>=thresholds.theta){factor(-Math.log(thresholds.f))}
     }
     return {"cn": cn, "table": table}
   }})
@@ -136,8 +139,7 @@ var literalListener = cache(function(utterance, qud, bias){
   Infer({method:'enumerate',model: function(){
     var bn = sample(bayesNetPrior(bias))
     condition(meaning(utterance, bn.table))
-    if(qud=='cn'){return bn.cn}
-    else if(qud == 'table'){return bn.table}
+    if(qud == 'table'){return bn.table}
     else{return bn}
   }})
 }, 10000)
@@ -154,13 +156,34 @@ var costs = function(utt){
   return cost
 }
 
+var getEVs = function(listener, probFunc){
+  var listener_avg = sum(map(function(LLtable) {
+    Math.exp(listener.score(LLtable)) * probFunc(LLtable)
+  }, listener.support()))
+  return listener_avg
+}
+
+var utterancePrior = function(bias){
+  var ps = bias=='lawn' ?
+    map(function(u){
+      var p =  (u!='C but -A') ? 1/(utterances.length-1) : 0
+      return p
+    }, utterances) : repeat(utterances.length,function(){return 1/utterances.length})
+
+  return Infer({method:'enumerate', model:function(){
+    var u = categorical({vs:utterances, ps:ps})
+    return u
+  }})
+}
+
 var speaker = cache(function(bn, bias, qud, printU){
   return Infer({method:'enumerate', model: function(){
-    var utterance = uniformDraw(utterances)
+    var utterance = sample(utterancePrior(bias))
     var LL = literalListener(utterance, qud, bias)
-    var utility = qud=='bn' ? LL.score(bn) : qud=='cn' ? LL.score(bn.cn) :
-    qud=='table' ? LL.score(bn.table) : error('unknown speaker qud: ' + qud)
-    if(printU){
+    var utility = qud=='bn' ? LL.score(bn) :
+    qud=='table' ? LL.score(bn.table) :
+    error('unknown speaker qud: ' + qud)
+    if(printU && utility!=-Infinity){
       print(utterance + utility)
     }
     factor(alpha * (utility - costs(utterance)))
@@ -169,10 +192,10 @@ var speaker = cache(function(bn, bias, qud, printU){
  })
 }, 10000)
 
-var listener = function(utterance, bias, speakerIntent){
+var listener = function(utterance, bias, speakerQUD){
   return Infer({method:'enumerate', model:function(){
                   var bn = sample(bayesNetPrior(bias))
-                  var qud = speakerIntent ? speakerIntent: sample(qudPrior)
+                  var qud = speakerQUD ? speakerQUD : sample(qudPrior)
                   observe(speaker(bn, bias, qud, false),utterance)
                   return {qud: qud, bn: bn}
                 }})
@@ -192,12 +215,16 @@ var bias = myDF["bias"][0]
 var utterance = myDF["utterance"][0]
 display('bias: ' + bias + ' utterance: ' + utterance)
 
+var prior = bayesNetPrior(bias)
+prior
+
 // 1. joint distributions (run-across-biases.r)
+// var PL = listener(utterance, bias, 'bn-goal')
 // var PL = listener(utterance, bias)
 // PL
 
-var LL = literalListener(utterance, "bn", bias)
-LL
+// var LL = literalListener(utterance, "bn", bias)
+// LL
 
 // 2. speaker suprisal (speaker-expectations.r)
 // var qud = myDF["qud"][0]
