@@ -29,12 +29,11 @@ buildDF_from_enumerate <- function(listener, withQUD=TRUE){
   return(df)
 }
 
-computeProbs <- function(df){
-  probs <- data.frame(matrix(ncol = 9, nrow = nrow(df)))
+computeProbs <- function(tables){
+  probs <- data.frame(matrix(ncol = 9, nrow = length(tables)))
   colnames(probs) <- c("pca", "pcna", "pnca", "pncna", "pc",
                        "pa", "pCgivenA", "pAgivenC", "pCgivenNA")
-  tables <- df$bn.table
-  
+
   probs$pca <- as.numeric(map(tables, 1))
   probs$pcna <- as.numeric(map(tables, 2))
   probs$pnca <- as.numeric(map(tables, 3))
@@ -47,17 +46,18 @@ computeProbs <- function(df){
   probs$pAgivenNC <- as.numeric(Map("/", probs$pnca, 1-probs$pc))
   probs$pCgivenNA <- as.numeric(Map("/", probs$pcna, 1-probs$pa))
   probs$pNCgivenNA <- as.numeric(Map("/", probs$pncna, 1-probs$pa))
+  probs$pNAgivenNC <- as.numeric(Map("/", probs$pncna, 1-probs$pc))
   return(probs)
 }
 
-marginalEVTables <- function(df_listener, type){
-  probVals <- computeProbs(df_listener)
+marginalEVTables <- function(df_listener, bias){
+  probVals <- computeProbs(df_listener$bn.table)
   ps <- df_listener$prob
   EVs <- data.frame(matrix(ncol = 10, nrow = 1))
   colnames(EVs) <- c("p_c_given_a", "p_c_given_na", "p_c",
                      "p_a_given_c", "p_a_given_nc", "p_a", 
                      "p_CA", "p_CNA", "p_NCA", "p_NCNA")
-  rownames(EVs) <- c(type)
+  rownames(EVs) <- c(bias)
 
   EVs$p_c_given_a <- round(x=sum(probVals$pCgivenA * ps), digits=3)
   EVs$p_a_given_c <- round(x=sum(probVals$pAgivenC * ps), digits=3)
@@ -75,8 +75,8 @@ marginalEVTables <- function(df_listener, type){
 }
 
 marginalEVQuds <- function(listener_df){
-  df <- data.frame(matrix(ncol=3, nrow=1))
-  colnames(df) <- c("qud_bn", "qud_cn", "qud_table")
+  df <- data.frame(matrix(ncol=2, nrow=1))
+  colnames(df) <- c("qud_bn", "qud_table")
   iter <- 0
   for(qud in QUDs){
     iter <- iter + 1
@@ -107,7 +107,7 @@ marginalEVCNs <- function(listener_df){
 }
 
 jointEVs <- function(listener_df){
-  probVals <- computeProbs(listener_df)
+  probVals <- computeProbs(listener_df$bn.table)
   ps <- listener_df$prob
   
   all_results <- data.frame(matrix(ncol=4, nrow=9))
