@@ -66,16 +66,6 @@ for (bias in biases) {
   avgs <- data.frame(colMeans(results))
   all_results[n_iter,] <- t(round(x=avgs, digits=3))
 
-  if(savePlots){
-    cnData <- sapply(CNs, function(x){return(avgs[[x,1]])})
-    visualizeAsBarPlot(cnData, bias, "cns")
-    
-    if(withQUD){
-      qudData <- sapply(QUDs, function(x){return(avgs[[paste("qud_", x, sep=""), 1]])})
-      visualizeAsBarPlot(qudData, bias, "quds")
-    }
-  }
-
   # average of expected vals for tables based on cns
   summed_ev_joint <- summed_ev_joint/n_runs
   all_ev_joints[,,n_iter] <- summed_ev_joint
