@@ -1,5 +1,6 @@
 source("constants.r")
 source("running-functions.r")
+source("data-processing-functions.r")
 source("visualize.r")
 require("grid")
 require("gridExtra")
@@ -8,65 +9,70 @@ require("gridExtra")
 model_path <- paste(BASEDIR, "vanilla-rsa-with-quds.wppl", sep="")
 
 # parameters for processing in R:
-withQUD <- FALSE # (depens on LL/PL)
+# make sure to change output in webppl file!!!!
+listenerType <- "LL"
+biases <- c("none", "lawn", "pizza", "douven1")
+n_runs <- 3
+
+if(listenerType=='PL'){
+  withQUD <- TRUE
+}else{
+  withQUD <- FALSE 
+}
 inferenceType <- "enumerate"
 viz <- FALSE
 savePlots <- TRUE
-
-listenerTypes <- c("none", "lawn-nn", "pizza", "douven1")
-n_runs <- 3
-
 ##### webppl loop ####
 if(withQUD){
-  all_results <- data.frame(matrix(ncol=22))
+  all_results <- data.frame(matrix(ncol=21))
 }else{
   all_results <- data.frame(matrix(ncol=19))
 }
-all_ev_joints <- array(dim=c(9,4,length(listenerTypes)))
+all_ev_joints <- array(dim=c(9,4,length(biases)))
 n_iter <- 0
-for (lt in listenerTypes) {
+for (bias in biases) {
   n_iter <- n_iter + 1
   results <- data.frame()
   summed_ev_joint <- matrix(0, ncol=4,nrow=9)
   for(i in seq(1,n_runs,1)){
-    if(lt=="douven1"){
+    if(bias=="douven1"){
       utt <- "If A, -C"
     }else{
       utt <- "If A, C"
     }
     # parameters for webppl program:
-    data <- list(bias=lt, utterance=utt)
+    data <- list(bias=bias, utterance=utt)
     listener <- posterior_with_data_input(model_path, data, viz, SEEDS[i])
+    saveRDS(listener, paste(listenerType, "-", bias,"-run-", i, ".rds", sep=""))
     if(!withQUD){
       c <- colnames(listener)
       c[c=="cn"] <- "bn.cn"
       c[c=="table"] <- "bn.table"
       colnames(listener) <- c
     }
-    
     if(inferenceType == "samples"){
       listener_df <- buildDF_from_samples(listener, withQUD)
     }else{
       listener_df <- buildDF_from_enumerate(listener, withQUD)
     }
-    res <- getEVs(listener_df, lt, withQUD)
+    res <- getEVs(listener_df, bias, withQUD)
     results <- rbind(results, res)
     
     EV_probs_cns <- jointEVs(listener_df)
     summed_ev_joint <- summed_ev_joint + as.matrix(EV_probs_cns)
   }
-  saveResults(results, lt, n_runs)
+  saveResults(results, bias, n_runs)
   
   avgs <- data.frame(colMeans(results))
   all_results[n_iter,] <- t(round(x=avgs, digits=3))
 
   if(savePlots){
     cnData <- sapply(CNs, function(x){return(avgs[[x,1]])})
-    visualizeAsBarPlot(cnData, lt, "cns")
+    visualizeAsBarPlot(cnData, bias, "cns")
     
     if(withQUD){
       qudData <- sapply(QUDs, function(x){return(avgs[[paste("qud_", x, sep=""), 1]])})
-      visualizeAsBarPlot(qudData, lt, "quds")
+      visualizeAsBarPlot(qudData, bias, "quds")
     }
   }
 
@@ -76,7 +82,7 @@ for (lt in listenerTypes) {
 }
 
 colnames(all_results) <- rownames(avgs)
-rownames(all_results) <- listenerTypes
+rownames(all_results) <- biases
 colnames(all_ev_joints) <- colnames(summed_ev_joint)
 rownames(all_ev_joints) <- rownames(summed_ev_joint)
 
