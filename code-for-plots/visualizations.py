@@ -1,11 +1,12 @@
 import pandas
 import matplotlib.pyplot as plt
 import numpy as np
+from matplotlib.font_manager import FontProperties
 
 CNs = ['A implies C', 'A implies -C', '-A implies C', '-A implies -C',
        'C implies A', 'C implies -A', '-C implies A', '-C implies -A',
        'A ind. C']
-BIAS = {1: "none", 2: "lawn-nn", 3: "pizza", 4: "douven1"}
+BIAS = {1: "none", 2: "lawn", 3: "pizza", 4: "douven1"}
 PROBS2IDX = {0: "p_CA", 1: "p_CNA", 2: "p_NCA", 3: "p_NCNA"}
 
 
@@ -19,7 +20,12 @@ def getData(fn_joint, fn_marginal):
 def tablePlots(fn_j, fn_m, listener):
     joint, marginal = getData(fn_j, fn_m)
 
+    cs = list(joint.columns)
+    biases = [int(s[-1]) for s in cs]
+
     for k, bias in BIAS.items():
+        if k not in biases:
+            continue
 #     k=1; bias="none"
         cols = [c for c in list(joint.columns) if c.endswith(str(k))]
         fig, axes = plt.subplots(nrows=3, ncols=3, figsize=(5.5, 5.5))
@@ -34,6 +40,10 @@ def tablePlots(fn_j, fn_m, listener):
 
                 ax.plot((0.5, 0.5), (2, 0), color='black')
                 ax.plot((1, 0), (1, 1), color='black')
+ 		ax.text(0.135, 1.85, 'C,A', fontsize=6)
+		ax.text(0.635, 1.85, 'C,-A', fontsize=6)
+		ax.text(0.135, 0.8, '-C,A', fontsize=6)
+		ax.text(0.635, 0.8, '-C,-A', fontsize=6)
                 for idx in range(4):
                     p = data[PROBS2IDX[idx] + "." + str(k)]
                     if idx == 0:
@@ -52,10 +62,21 @@ def tablePlots(fn_j, fn_m, listener):
                     ax.set_ylim([0, 2])
                     ax.set_xlim([0, 1.2])
                     ax.set_xticks([])
-                    ax.set_yticks([0.1, 0.5, 0.9, 1.2, 1.6, 2.0])
-                    ax.set_yticklabels([0.1, 0.5, 0.9, 0.1, 0.5, 0.9])
-                    ax.set_frame_on(False)
+                    
+		    if c == 0:
+		      ax.set_yticks([0, 0.5, 1, 1.5, 2.0])
+                      ax.set_yticklabels([0, 0.5, '1/0', 0.5, 1.0])
+		      ax.yaxis.set_ticks_position('left')
+		    elif c==2:
+		      ax.set_yticks([0, 0.5, 1, 1.5, 2.0])
+                      ax.set_yticklabels([0, 0.5, '1/0', 0.5, 1.0])
+		      ax.yaxis.set_ticks_position('right')
+		    
+		    else:
+                      ax.set_yticks([])                  
 
+		    ax.set_frame_on(False)
+		    ax.tick_params(labelsize=10)
                 # marginal bar
                 p_cn = marginal[cn][bias]
                 ax.fill_between([1, 1.05], [0, 0], [p_cn, p_cn], color='r')
@@ -64,13 +85,15 @@ def tablePlots(fn_j, fn_m, listener):
                 ax.set_title(cn + p, fontsize=8)
 
         fig.suptitle("Bias: " + bias)
-        fig.subplots_adjust(hspace=0.4, wspace=0.2)
+        fig.subplots_adjust(hspace=0.4, wspace=0.25)
         plt.savefig(bias + '-' + listener + '.png')
 
 if __name__ == '__main__':
 
     listener = "PL" # PL or LL
 
+    #fn_joint = '/home/britta/UNI/Masterarbeit/conditionals/rwebppl/evs-joint.csv'
+    #fn_marginal = '/home/britta/UNI/Masterarbeit/conditionals/rwebppl/evs-marginal.csv'
     fn_joint = './../rwebppl/results-' + listener + '-3-runs-each-bias/evs-joint.csv'
     fn_marginal = './../rwebppl/results-' + listener + '-3-runs-each-bias/evs-marginal.csv'
 
