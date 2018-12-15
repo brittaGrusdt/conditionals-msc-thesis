@@ -63,7 +63,7 @@ plotPerfectionProbs <- function(bias){
   # Barplot of expected values for perfection probs
   collist <- c('pCgivenA', 'pNAgivenNC', 'pAgivenC', 'pNCgivenNA')
   labels <- c("E[P(C|A)]", "E[P(-A|-C)]", "E[P(A|C)]", "E[P(-C|-A)]")
-  
+
   # with pragmatic and literal listener
   evs <- aggregate(df[, collist], list(df$lt), mean)
   evs <- format(evs, digits = 2)
@@ -74,14 +74,33 @@ plotPerfectionProbs <- function(bias){
   
   ggplot(evs.long, aes(x=variable, y=value, fill=factor(lt))) +
     geom_bar(stat="identity", position="dodge") +
-    # scale_x_continuous(labels=labels,breaks=1:4) +
-    # scale_y_continuous(labels=c('0','0.25','0.5','0.75','1',''), breaks=c(0,0.25,0.5,0.75,1,1.2), limits=c(0,1.1)) +
-    # geom_text(aes(label=evs), vjust = -0.4, size=2.5) +
     xlab('') + ylab('') + 
     theme(text = element_text(size=10), axis.text.x = element_text(angle = 60, hjust = 1),
           legend.title=element_blank()) + 
     facet_wrap(~lt)
-  ggsave("./plots/expValsCP-LL-PL.png", width = 2.5, height=3)
+  ggsave("./plots/expValsCP-LL-PL.png", width = 3, height=3)
+  
+  # Density plots of the 4 relevant conditional probabilities for PL and LL
+  df2 <- df[,c(collist,"lt")]
+  df2.long <- melt(df2,id.vars="lt")
+  df2.long.ll <- df2.long[which(df2.long$lt=='LL'),]
+  df2.long.pl <- df2.long[which(df2.long$lt=='PL'),]
+  
+  labels <- c("P(C|A)", "P(-C|-A)",  "P(A|C)", "P(-A|-C)")
+  df2.long.ll$variable <- mapvalues(df2.long.ll$variable, from=collist, to=labels)
+  df2.long.pl$variable <- mapvalues(df2.long.pl$variable, from=collist, to=labels)
+  
+  ggplot(data = df2.long.ll, aes(x=value)) +
+    geom_density(aes(color=variable),show.legend = FALSE, alpha = 0.4) +
+    xlab('')  + theme(text = element_text(size=10)) +
+    facet_wrap( ~ variable, scales="free_y")
+  ggsave("./plots/cp-densities-LL.png", width = 3, height=3)
+  
+  ggplot(data = df2.long.pl, aes(x=value)) +
+    geom_density(aes(color=variable),show.legend = FALSE, alpha = 0.4) +
+    xlab('') + ylab('') + theme(text = element_text(size=10)) +
+    facet_wrap( ~ variable, scales="free_y")
+  ggsave("./plots/cp-densities-PL.png", width = 3, height=3)
 }
 
 plotCNs <- function(bias){
@@ -103,7 +122,7 @@ plotCNs <- function(bias){
     theme(text = element_text(size=10), axis.text.x = element_text(angle = 60, hjust = 1),
           legend.title=element_blank()) + 
     facet_wrap(~lt)
-  ggsave("./plots/cns-LL-PL.png", width = 5, height=3.5)
+  ggsave(paste("./plots/cns-LL-PL-", bias, ".png", sep=""), width = 5, height=3.5)
 }
 
 plotTablesPrior <- function(){
