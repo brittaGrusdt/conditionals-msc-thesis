@@ -9,13 +9,13 @@ require(reshape2)
 
 #####
 readData <- function(lt, bias){
-  fn <- paste("/home/britta/UNI/Masterarbeit/conditionals/rwebppl/results-", lt, "-3-runs-each-bias/",
-              lt, "-", bias, ".rds", sep="")
+  fn <- paste("/home/britta/UNI/Masterarbeit/conditionals/rwebppl/results-", lt,
+              "-3-runs-each-bias/", lt, "-", bias, ".rds", sep="")
   data <- readRDS(fn)
   return(data)
 }
 
-getDistrData <- function(lt, bias){
+getSamples <- function(lt, bias){
   posterior <- readData(lt, bias)
   samples <- get_samples(posterior,10000)
   if(lt=='LL'){
@@ -31,13 +31,16 @@ getDistrData <- function(lt, bias){
   return(probs)
 }
 
-#### Visualizations with R
-plotDistributions <- function(bias, utterance){
-  # Probability Plots P(C) and P(A)
-  df_ll <- getDistrData('LL', bias)
-  df_pl <- getDistrData('PL', bias)
+getData <- function(bias){
+  df_ll <- getSamples('LL', bias)
+  df_pl <- getSamples('PL', bias)
   df <- rbind(df_ll,df_pl)
-  
+  return(df)
+}
+
+#### Visualizations with R
+plotPC_PA <- function(bias){
+  df <- getData(bias)
   mu_pc <- ddply(df, "lt", summarise, grp.mean=mean(pc))
   mu_pa <- ddply(df, "lt", summarise, grp.mean=mean(pa))
   
@@ -46,13 +49,17 @@ plotDistributions <- function(bias, utterance){
     geom_vline(data=mu_pc, aes(xintercept=grp.mean, color=lt), linetype="dashed") +
     labs(x = "P(C)")
   ggsave("./plots/pc.png", width = 3, height=2.5)
-
+  
   ggplot(df, aes(x=pa,color=lt)) +
     geom_density() +
     geom_vline(data=mu_pa, aes(xintercept=grp.mean, color=lt), linetype="dashed") +
     labs(x = "P(A)")
   ggsave("./plots/pa.png", width = 3, height=2.5)
-  
+}
+
+
+plotPerfectionProbs <- function(bias){
+  df <- getData(bias)
   # Barplot of expected values for perfection probs
   collist <- c('pCgivenA', 'pNAgivenNC', 'pAgivenC', 'pNCgivenNA')
   labels <- c("E[P(C|A)]", "E[P(-A|-C)]", "E[P(A|C)]", "E[P(-C|-A)]")
@@ -75,7 +82,10 @@ plotDistributions <- function(bias, utterance){
           legend.title=element_blank()) + 
     facet_wrap(~lt)
   ggsave("./plots/expValsCP-LL-PL.png", width = 2.5, height=3)
-  
+}
+
+plotCNs <- function(bias){
+  df <- getData(bias)
   # barplot for causal networks
   ll_cn <- as.data.frame(table(filter(df, lt=='LL')$cn))
   ll_cn$lt <- rep("LL", nrow(ll_cn))
@@ -94,51 +104,7 @@ plotDistributions <- function(bias, utterance){
           legend.title=element_blank()) + 
     facet_wrap(~lt)
   ggsave("./plots/cns-LL-PL.png", width = 5, height=3.5)
-
 }
-
-
-visualizeAsBarPlot <- function(evs, bias, kind){
-  # One barplot command to get histogram of x
-  jpeg(paste(bias, "-", kind, ".jpeg", sep=""), width = 480, height=480)
-  indices <- as.logical(evs)
-  par(oma = c( 5, 0, 3, 0))
-  y <- as.numeric(round(x=evs[indices], digits=2))
-  graph <- barplot(height = y,
-          names.arg = names(evs)[indices],
-          las = 2,
-          width = rep(0.1, sum(indices)),
-          xlim = c(0, 1),
-          ylim = c(0, 1.1),
-          col=c("darkblue"),
-          main = bias)
-  text(graph, y=y+0.05, labels=y)
-  dev.off()
-}
-
-saveResults <- function(results, bias, n_runs){
-  pdf(paste(bias, "-", n_runs, "-runs", sep=""))
-  grid.newpage()
-  grid.table(t(results))
-  dev.off()
-}
-
-
-visualizeSpeaker <- function(speaker, bias, qud){
-  par(oma = c( 5, 0, 3, 0))
-  y <- as.numeric(round(x=speaker$prob, digits=2))
-  graph <- barplot(height = y,
-                   names.arg = speaker$support,
-                   las = 2,
-                   width = rep(0.1, length(speaker$support)),
-                   xlim = c(0, 1),
-                   ylim = c(0, 1.1),
-                   col=c("darkblue"),
-                   main = paste("bias:", bias, "qud:", qud, sep=" "))
-  text(graph, y=y+0.05, labels=y)
-}
-
-
 
 plotTablesPrior <- function(){
   prior <- webppl(program_file = paste(BASEDIR, "vanilla-rsa-with-quds-bn-prior.wppl", sep=""),
@@ -168,3 +134,5 @@ plotTablesPrior <- function(){
   ggsave("./plots/tablesPrior.png", width = 2, height=2)
 
 }
+
+
