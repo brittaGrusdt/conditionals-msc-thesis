@@ -1,5 +1,5 @@
 ////////////  SET PARAMETERS  /////////////////
-var alpha = 5
+globalStore.alpha = 5
 var thresholds = {t: 0.9, f: 0.05, likely: 0.7, theta: 0.9, theta_maybe: 0.5}
 var literals = ["A", "C", "-A", "-C"]
 var conditionals = ["If A, C", "If A, -C", "If -A, C", "If -A, -C",
@@ -24,7 +24,7 @@ var params = {'none_p_ind': 1/3,
              'lawn_p_ind': 1/3,
              'pizza_p_ind': 1,
              'douven1_p_ind': 0.9,
-             'wason-abstract_p_ind': 1/8,
+             'wason-abstract_p_ind': 1/2,
              'amherst_p_ind': 1/3}
 
 var roundTo3 = function(x){
@@ -55,7 +55,6 @@ var tablesPrior = mem(function(){
 var tables = tablesPrior().support()
 display('nb tables: ' + tables.length)
 
-var span = 0.03
 var logLikelihood = cache(function(table, cn){
   var p = cn=="A implies C" ? pCgivenA(table) :
   cn=='A implies -C' ? 1-pCgivenA(table)  :
@@ -65,15 +64,14 @@ var logLikelihood = cache(function(table, cn){
   cn=="C implies -A" ? 1-pAgivenC(table) :
   cn=="-C implies A" ? pAgivenNC(table) :
   cn=="-C implies -A" ? 1-pAgivenNC(table) :
-  cn=="A ind. C" ? ((pCgivenA(table) >= (pCgivenNA(table) - span) &&
-                    pCgivenA(table) <= (pCgivenNA(table) + span))
-                    &&
-                    (pAgivenC(table) >= (pAgivenNC(table) - span) &&
-                    pAgivenC(table) <= (pAgivenNC(table) + span)) ? 0.99 : 0.01) :
+  cn=="A ind. C" ?
+      Math.abs(pCgivenA(table) - pc(table)) +
+      Math.abs(pCgivenNA(table) - pc(table)):
 
   error('unknown cn in likelihood: ' + cn)
 
-  var logL =  Beta({a:10, b:1}).score(p)
+  var logL = cn=='A ind. C' ? (p<=0.02 ? Beta({a:10, b:1}).score(1-p) : 0) :
+                  Beta({a:10, b:1}).score(p)
   return logL
 })
 
@@ -97,6 +95,12 @@ var bayesNetPrior = cache(function(bias){
       if(pc(table)>=thresholds.likely){factor(-Math.log(thresholds.f))}
     }else if(bias=='amherst'){
       if(pa(table)>=thresholds.theta){factor(-Math.log(thresholds.f))}
+    }
+    else if(bias=='wason-abstract'){
+      // condition(pc(table)>=thresholds.theta)
+      // condition(pnc(table)>=thresholds.theta)
+      // condition(pna(table)>=thresholds.theta)
+      // condition(pa(table)>=thresholds.theta)
     }
     return {"cn": cn, "table": table}
   }})
@@ -186,7 +190,7 @@ var speaker = cache(function(bn, bias, qud, printU){
     if(printU && utility!=-Infinity){
       print(utterance + utility)
     }
-    factor(alpha * (utility - costs(utterance)))
+    factor(globalStore.alpha * (utility - costs(utterance)))
     return utterance
   }
  })
@@ -197,37 +201,44 @@ var listener = function(utterance, bias, speakerQUD){
                   var bn = sample(bayesNetPrior(bias))
                   var qud = speakerQUD ? speakerQUD : sample(qudPrior)
                   observe(speaker(bn, bias, qud, false),utterance)
+                  // condition(bn.cn=='A implies C' || bn.cn=='-C implies -A')
+                  // condition(bn.cn=='C implies A' || bn.cn=='-A implies -C')
+
                   return {qud: qud, bn: bn}
                 }})
 }
-var speakerExpectation = function(n, qud, bias, utterance){
+var speakerExpectation = function(n, qud, bias){
   var bnsFromPrior = repeat(n, function(){return sample(bayesNetPrior(bias))})
-  var likelihoods = map(function(bn){
-    var speakerBeliefs = speaker(bn, bias, qud)
-    var likelihood = Math.exp(speakerBeliefs.score(utterance))
-    return likelihood
-  }, bnsFromPrior)
-  return likelihoods
+  var likelihoods = map(function(utt){
+      return sum(map(function(bn){
+        var speakerBeliefs = speaker(bn, bias, qud, false)
+        var likelihood = Math.exp(speakerBeliefs.score(utt))
+        return likelihood}, bnsFromPrior))/n
+      }, utterances)
+
+  return zip(utterances, likelihoods)
 }
 
 // ---For R-scripts---
 var bias = myDF["bias"][0]
 var utterance = myDF["utterance"][0]
+var lt = myDF["lt"][0]
 display('bias: ' + bias + ' utterance: ' + utterance)
 
-var prior = bayesNetPrior(bias)
-prior
+// 2. speaker expectation (speaker-expectations.r)
+var qud = lt=='SE' ? myDF["qud"][0] : ""
+
+var keys = reduce(function(vals,acc){acc.concat(vals)},[], Object.keys(myDF))
+if(keys.includes("alpha")){
+  globalStore.alpha=myDF["alpha"][0]
+  display('alpha: ' + globalStore.alpha)
+}
+
 
 // 1. joint distributions (run-across-biases.r)
-// var PL = listener(utterance, bias, 'bn-goal')
-// var PL = listener(utterance, bias)
-// PL
+var posterior = lt=='PL' ? listener(utterance, bias) :
+               lt=='LL' ? literalListener(utterance, "bn", bias) :
+               lt=='SE' ? speakerExpectation(1000,qud, bias) :
+               error('unknown listener type: ' + lt)
 
-// var LL = literalListener(utterance, "bn", bias)
-// LL
-
-// 2. speaker suprisal (speaker-expectations.r)
-// var qud = myDF["qud"][0]
-// display(qud)
-// var se = speakerExpectation(1000,qud, bias, utterance)
-// se
+posterior
