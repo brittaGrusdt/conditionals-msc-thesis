@@ -1,0 +1,104 @@
+var getEVs = function(listener, probFunc){
+  var listener_avg = sum(map(function(LLtable) {
+    Math.exp(listener.score(LLtable)) * probFunc(LLtable)
+  }, listener.support()))
+  return listener_avg
+}
+
+var marginalizeDependentNets = function(listener){
+  return marginalize(listener, function(bn){
+    return{causalNets: dependentAC.includes(bn.cn) ? 'A implies C' :
+           dependentCA.includes(bn.cn) ? 'C implies A' : 'independent'}
+  })
+}
+
+var evs = function(listener){
+  return {'C|A': getEVs(listener, pCgivenA),
+          'A|C': getEVs(listener, pAgivenC),
+          'C|-A': getEVs(listener, pCgivenNA),
+          'A|-C': getEVs(listener, pAgivenNC),
+          'A': getEVs(listener, pa),
+          'C': getEVs(listener, pc)}
+}
+
+var displayListener = function(listener, utterance, listenerType, bias){
+  display([listenerType, utterance, bias].join(" %% "))
+  viz(marginalize(listener, function(bn){return{causalNet: bn.cn}}))
+  viz(marginalizeDependentNets(listener))
+  var listenerProbs = marginalize(listener, function(bn){return bn.table})
+  var expVals = evs(listenerProbs)
+  var z = map(function(k){display(k+' '+expVals[k])}, Object.keys(expVals))
+  viz(marginalize(listenerProbs, function(table){return {pa:pa(table)}}))
+  viz(marginalize(listenerProbs, function(table){return {pc:pc(table)}}))
+
+  var pas = sort(repeat(1001, function(){return pa(sample(listenerProbs))}), gt)
+  var pcs = sort(repeat(1001, function(){return pc(sample(listenerProbs))}), gt)
+  var mean_pa = listMean(pas); var mean_pc = listMean(pcs);
+  var std_pa = listStdev(pas, mean_pa); var std_pc = listStdev(pcs, mean_pc);
+  display('mean_pa: ' + mean_pa + ' std_pa: ' + std_pa)
+  display('mean_pc: ' + mean_pc + ' std_pc: ' + std_pc)
+}
+
+var displaySpeaker = function(bias, state, disp){
+  display('bias: '.concat(bias))
+  var state = state.sample=='LL' ?
+      sample(literalListener(state.utterance, "bn", bias)) : (state.sample=='prior' ?
+  sample(bayesNetPrior(bias)) : state)
+  print('speaker p: ' + state.table)
+  print('speaker cn: ' + state.cn)
+  var bn = {"cn": state.cn, "table": state.table}
+  viz(speaker(bn, bias, disp))
+}
+//-----SETUP VARIABLES-----//
+var utterance = "If A, C"
+
+var bias = "none"
+// var bias = "pizza"
+// var bias = "lawn"
+// var bias = "douven1"
+
+//-----MAKE PLOTS-----//
+display('speakerOptimality: ' + globalStore.alpha)
+
+// var prior = bayesNetPrior(bias)
+// viz(prior)
+// viz.table(prior, {groupBy: 'cn'})
+// displayListener(prior, '', 'Bayes Net Prior', bias)
+// var independent_bns = filter(function(bn){bn.cn=='A implies C'}, prior.support())
+// viz.table(independent_bns)
+// var pcs = map(function(bn){return pc(bn.table)}, independent_bns)
+// var pcas = map(function(bn){return pCgivenA(bn.table)}, independent_bns)
+// viz.scatter(pcs,pcas)
+
+
+// var LL = literalListener(utterance, bias)
+// viz.table(LL)
+// displayListener(LL, utterance, 'LL', bias)
+// viz.table(LL)
+// var z = map(function(utterance){
+//   print(utterance)
+//   var LL = literalListener(utterance, bias)
+//   displayListener(LL, utterance, 'LL', bias)
+// }, utterances)
+
+// var state = {utterance:'If A, C', sample:'prior',
+//              table:[0.001,0.9,0.09,0.009], cn:'-C implies A'}
+// displaySpeaker(bias, state, true)
+
+// var PL = listener(utterance, bias)
+// var PLbn = marginalize(PL, function(s){return s['bn']})
+
+// map(function(){
+//   var bn = sample(PLbn)
+//   var state = {utterance:'If A, C', sample:'',
+//                table:bn.table, cn:bn.cn}
+//   displaySpeaker(bias, state)}, _.range(5))
+
+// var se = speakerExpectation(10, bias, utterance)
+// print(se)
+
+
+// var surprise = speakerDistributions(none', 'If A, C')
+// viz(surprise)
+// var surprise = speakerDistributions('none', 'C')
+// viz(surprise)
