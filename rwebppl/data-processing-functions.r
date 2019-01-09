@@ -1,6 +1,7 @@
 source("constants.r")
-library(purrr)
 library(dplyr)
+library(purrr)
+library("varhandle")
 ####################
 
 buildDF_from_samples <- function(listener, withQUD=TRUE){
@@ -48,6 +49,21 @@ computeProbs <- function(tables){
   probs$pNCgivenNA <- as.numeric(Map("/", probs$pncna, 1-probs$pa))
   probs$pNAgivenNC <- as.numeric(Map("/", probs$pncna, 1-probs$pc))
   return(probs)
+}
+
+##### expected values ###### 
+
+getEVs <- function(listener_df, bias, withQud){
+  
+  EV_probs <- marginalEVTables(listener_df, bias)
+  EV_cns <- marginalEVCNs(listener_df)
+  if(withQud){
+    EV_quds <- marginalEVQuds(listener_df)
+    EVs <- cbind(EV_quds,EV_probs, EV_cns)
+  }else{
+    EVs <- cbind(EV_probs, EV_cns)
+  }
+  return(EVs)
 }
 
 marginalEVTables <- function(df_listener, bias){
@@ -106,7 +122,7 @@ marginalEVCNs <- function(listener_df){
   return(df)
 }
 
-jointEVs <- function(listener_df){
+conditionedEVs <- function(listener_df){
   probVals <- computeProbs(listener_df$bn.table)
   ps <- listener_df$prob
   
@@ -135,9 +151,43 @@ jointEVs <- function(listener_df){
   return(all_results)
 }
 
+##### save, read data ###### 
+saveResults <- function(results, bias, n_runs, target_dir){
+  pdf(paste(target_dir, bias, "-", n_runs, "-runs", sep=""))
+  grid.newpage()
+  grid.table(t(results))
+  dev.off()
+}
 
+getSamples <- function(lt, posterior){
+  samples <- get_samples(posterior,10000)
+  if(lt=='LL'){
+    tables <- samples$table
+    cns <- samples$cn
+  }else{
+    tables <- samples$bn.table
+    cns <- samples$bn.cn
+  }
+  probs <- computeProbs(tables)
+  probs$lt <- rep(lt,length(probs$pc))
+  probs$cn <- cns
+  return(probs)
+}
 
+getData <- function(ll_posterior, pl_posterior){
+  df_ll <- getSamples('LL', ll_posterior)
+  df_pl <- getSamples('PL', pl_posterior)
+  df <- rbind(df_ll,df_pl)
+  return(df)
+}
 
+readData <- function(lt, bias, folderName, nrun=1){
+  target_dir <- paste("./", folderName, "/", lt, "/",sep="")
+  fn <- paste(target_dir, bias, "-run-", nrun, ".rds", sep="")
+  print(paste('read data from: ', fn, sep=""))
+  data <- readRDS(fn)
+  return(data)
+}
 
 
 
