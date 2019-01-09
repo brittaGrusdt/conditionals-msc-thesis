@@ -1,46 +1,15 @@
+source("data-processing-functions.r")
+source("constants.r")
 require("grid")
 require("gridExtra")
 require("ggplot2")
 require("plyr")
-library(purrr)
-source("data-processing-functions.r")
-source("constants.r")
 require(reshape2)
+library(purrr)
 
-#####
-readData <- function(lt, bias){
-  fn <- paste("/home/britta/UNI/Masterarbeit/conditionals/rwebppl/results-", lt,
-              "-3-runs-each-bias/", lt, "-", bias, ".rds", sep="")
-  data <- readRDS(fn)
-  return(data)
-}
-
-getSamples <- function(lt, bias){
-  posterior <- readData(lt, bias)
-  samples <- get_samples(posterior,10000)
-  if(lt=='LL'){
-    tables <- samples$table
-    cns <- samples$cn
-  }else{
-    tables <- samples$bn.table
-    cns <- samples$bn.cn
-  }
-  probs <- computeProbs(tables)
-  probs$lt <- rep(lt,length(probs$pc))
-  probs$cn <- cns
-  return(probs)
-}
-
-getData <- function(bias){
-  df_ll <- getSamples('LL', bias)
-  df_pl <- getSamples('PL', bias)
-  df <- rbind(df_ll,df_pl)
-  return(df)
-}
-
-#### Visualizations with R
-plotPC_PA <- function(bias){
-  df <- getData(bias)
+###### PLOTs for LL + PL #####
+plotPC_PA <- function(bias, fn, ll_posterior, pl_posterior){
+  df <- getData(ll_posterior, pl_posterior)
   mu_pc <- ddply(df, "lt", summarise, grp.mean=mean(pc))
   mu_pa <- ddply(df, "lt", summarise, grp.mean=mean(pa))
   
@@ -48,18 +17,17 @@ plotPC_PA <- function(bias){
     geom_density() +
     geom_vline(data=mu_pc, aes(xintercept=grp.mean, color=lt), linetype="dashed") +
     labs(x = "P(C)")
-  ggsave("./plots/pc.png", width = 3, height=2.5)
+  ggsave(paste("./", fn, "/plots/", bias, "-pc.png", sep=""), width = 3, height=2.5)
   
   ggplot(df, aes(x=pa,color=lt)) +
     geom_density() +
     geom_vline(data=mu_pa, aes(xintercept=grp.mean, color=lt), linetype="dashed") +
     labs(x = "P(A)")
-  ggsave("./plots/pa.png", width = 3, height=2.5)
+  ggsave(paste("./", fn, "/plots/", bias, "-pa.png", sep=""), width = 3, height=2.5)
 }
 
-
-plotPerfectionProbs <- function(bias){
-  df <- getData(bias)
+plotPerfectionProbs <- function(bias, fn, ll_posterior, pl_posterior){
+  df <- getData(ll_posterior, pl_posterior)
   # Barplot of expected values for perfection probs
   collist <- c('pCgivenA', 'pNAgivenNC', 'pAgivenC', 'pNCgivenNA')
   labels <- c("E[P(C|A)]", "E[P(-A|-C)]", "E[P(A|C)]", "E[P(-C|-A)]")
@@ -74,19 +42,18 @@ plotPerfectionProbs <- function(bias){
   
   ggplot(evs.long, aes(x=variable, y=value, fill=factor(lt))) +
     geom_bar(stat="identity", position="dodge") +
-    xlab('') + ylab('') + 
+    xlab('') + ylab('') +
     theme(text = element_text(size=10), axis.text.x = element_text(angle = 60, hjust = 1),
-          legend.title=element_blank()) + 
+          legend.title=element_blank()) +
     facet_wrap(~lt)
-  ggsave("./plots/expValsCP-LL-PL.png", width = 3, height=3)
-  
+  ggsave(paste(fn, "/plots/", bias, "-expValsCP-LL-PL.png", sep=""), width = 3, height=3)
   # Density plots of the 4 relevant conditional probabilities for PL and LL
   df2 <- df[,c(collist,"lt")]
   df2.long <- melt(df2,id.vars="lt")
   df2.long.ll <- df2.long[which(df2.long$lt=='LL'),]
   df2.long.pl <- df2.long[which(df2.long$lt=='PL'),]
   
-  labels <- c("P(C|A)", "P(-C|-A)",  "P(A|C)", "P(-A|-C)")
+  labels <- c("P(C|A)", "P(-A|-C)",  "P(A|C)", "P(-C|-A)")
   df2.long.ll$variable <- mapvalues(df2.long.ll$variable, from=collist, to=labels)
   df2.long.pl$variable <- mapvalues(df2.long.pl$variable, from=collist, to=labels)
   
@@ -94,17 +61,17 @@ plotPerfectionProbs <- function(bias){
     geom_density(aes(color=variable),show.legend = FALSE, alpha = 0.4) +
     xlab('')  + theme(text = element_text(size=10)) +
     facet_wrap( ~ variable, scales="free_y")
-  ggsave("./plots/cp-densities-LL.png", width = 3, height=3)
+  ggsave(paste(fn, "/plots/", bias, "-cp-densities-LL.png", sep=""), width = 3, height=3)
   
   ggplot(data = df2.long.pl, aes(x=value)) +
     geom_density(aes(color=variable),show.legend = FALSE, alpha = 0.4) +
     xlab('') + ylab('') + theme(text = element_text(size=10)) +
     facet_wrap( ~ variable, scales="free_y")
-  ggsave("./plots/cp-densities-PL.png", width = 3, height=3)
+  ggsave(paste(fn, "/plots/", bias, "-cp-densities-PL.png", sep=""), width = 3, height=3)
 }
 
-plotCNs <- function(bias){
-  df <- getData(bias)
+plotCNs_LLPL <- function(bias, fn, ll_posterior, pl_posterior){
+  df <- getData(ll_posterior, pl_posterior)
   # barplot for causal networks
   ll_cn <- as.data.frame(table(filter(df, lt=='LL')$cn))
   ll_cn$lt <- rep("LL", nrow(ll_cn))
@@ -122,14 +89,11 @@ plotCNs <- function(bias){
     theme(text = element_text(size=10), axis.text.x = element_text(angle = 60, hjust = 1),
           legend.title=element_blank()) + 
     facet_wrap(~lt)
-  ggsave(paste("./plots/cns-LL-PL-", bias, ".png", sep=""), width = 5, height=3.5)
+  ggsave(paste(fn, "/plots/", bias, "-cns-LL-PL.png", sep=""), width = 5, height=3.5)
 }
 
-plotTablesPrior <- function(){
-  prior <- webppl(program_file = paste(BASEDIR, "vanilla-rsa-with-quds-bn-prior.wppl", sep=""),
-                  random_seed=SEEDS[1])
-  samples <- get_samples(prior, 10000)
-  probs <- computeProbs(samples$table)
+###### Plots for single distribuion #####
+plotTables <- function(probs, fn, bias, lt){
   t0 <- probs$pca 
   t1 <- probs$pcna
   t2 <- probs$pnca
@@ -150,8 +114,42 @@ plotTablesPrior <- function(){
     geom_vline(aes(xintercept=val), data=df2, linetype="dashed", color="blue") +
     facet_wrap(~entry,scales="free_y")
   
-  ggsave("./plots/tablesPrior.png", width = 2, height=2)
+  ggsave(paste(fn, "/", lt, "/plots/", bias, "-tables.png", sep=""), width = 2, height=2)
 
 }
 
+plotCNs <- function(samples, fn, bias, lt){
+  df <- as.data.frame(samples$cn)
+  df <- count(df)
+  df$freq <- round(x=df$freq / sum(df$freq),digits=2)
+  
+  ggplot(df, aes(x=samples.cn, y=freq)) +
+    geom_bar(stat="identity", show.legend = FALSE, fill="blue") +
+    geom_text(aes(label=freq), vjust = -0.4, size=2.5) +
+    xlab('') + ylab('') + 
+    theme(text = element_text(size=10), axis.text.x = element_text(angle = 60, hjust = 1),
+          legend.title=element_blank())
+  target <- paste(fn, "/", lt, "/plots/", bias, "-cns.png", sep="")
+  print(target)
+  ggsave(target, width = 5, height=3.5)
+  
+}
+
+plotQUDs <- function(bias, fn, ll_posterior, pl_posterior){
+  for(bias in BIASES){
+    posterior <- readData('PL', bias, fn)
+    samples <- get_samples(posterior,10000)
+    x <- levels(factor(samples$qud))
+    y <- table(samples$qud)
+    y <- y/sum(y)
+    
+    ggplot(data.frame(x=x,y=y), aes(x=x, y=y)) +
+      geom_bar(stat="identity", show.legend = FALSE, fill='steelblue') +
+      # geom_text(aes(label=Freq), vjust = -0.4, size=2.5) +
+      xlab('') + ylab('') + 
+      scale_y_continuous(labels = percent) +
+      theme(text = element_text(size=10)) 
+    ggsave(paste(fn, "/plots/", bias, "-quds-PL.png", sep=""), width = 2, height=3)
+  }
+}
 
