@@ -7,13 +7,11 @@ require("gridExtra")
 # ----------------- #
 # Parameters #### 
 model_path <- paste(BASEDIR, "model.wppl", sep="")
-save <- TRUE
 listenerType <- "LL" # LL / PL
-n_runs <- 1
-# biases <- c("none", "lawn", "pizza", "douven1")
-biases <- c("none")
-#alphas = c(1,3,10,20)
-alphas = c(5)
+n_runs <- 3
+biases <- c("none", "lawn", "pizza", "douven1")
+# biases <- c("lawn")
+alphas = c(1,3,5,10,20)
 
 base <- "results-all-biases"
 # base <- "results-across-alpha"
@@ -77,8 +75,9 @@ for(alpha in alphas){
       EV_probs_cns <- conditionedEVs(listener_df)
       summed_ev_joint <- summed_ev_joint + as.matrix(EV_probs_cns)
     }
-    saveResults(results, bias, n_runs, target_dir)
-    
+    if(n_runs!=1){
+      saveResults(results, bias, n_runs, target_dir)
+    }
     avgs <- data.frame(colMeans(results))
     all_results[n_iter,] <- t(round(x=avgs, digits=3))
   
@@ -87,16 +86,19 @@ for(alpha in alphas){
     all_ev_joints[,,n_iter] <- summed_ev_joint
   }
 
-  if(save){
+  if(n_runs!=1){
     colnames(all_results) <- rownames(avgs)
     rownames(all_results) <- biases
     colnames(all_ev_joints) <- colnames(summed_ev_joint)
     rownames(all_ev_joints) <- rownames(summed_ev_joint)
     
-    write.csv(all_results, file=paste(target_dir, 'evs-marginal.csv', sep=""))
-    write.csv(all_ev_joints, file=paste(target_dir, 'evs-conditioned.csv', sep=""))
+    write.csv(all_results, file=paste(target_dir, 'evs-marginal-n_runs-', n_runs, '.csv', sep=""))
+    write.csv(all_ev_joints, file=paste(target_dir, 'evs-conditioned-n_runs-', n_runs, '.csv', sep=""))
     
-    saveRDS(all_results, paste(target_dir, "evs-marginal.rds", sep=""))
-    saveRDS(all_ev_joints, paste(target_dir, "evs-conditioned.rds", sep=""))
+    saveRDS(all_results, paste(target_dir, 'evs-marginal-n_runs-', n_runs, '.rds', sep=""))
+    saveRDS(all_ev_joints, paste(target_dir, 'evs-conditioned-n_runs-', n_runs, '.rds', sep=""))
+  }
+  if(listenerType=='prior' || listenerType=='LL'){
+    break;
   }
 }
