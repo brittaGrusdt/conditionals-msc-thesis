@@ -19,7 +19,7 @@ def getData(fn_conditioned, fn_marginal):
     return conditioned, marginal
 
 
-def tablePlots(fn_j, fn_m, listener):
+def tablePlots(fn_j, fn_m, listener, alpha):
     conditioned, marginal = getData(fn_j, fn_m)
     cs = list(conditioned.columns)
     print(cs)
@@ -88,23 +88,36 @@ def tablePlots(fn_j, fn_m, listener):
 
         fig.suptitle("Bias: " + bias)
         fig.subplots_adjust(hspace=0.4, wspace=0.25)
-        plt.savefig(bias + '-' + listener + '.png')
+        
+        if listener=='PL':
+          plt.savefig(listener + '-' + bias + '-alpha-' + str(alpha) + '.png')
+        else:
+          plt.savefig(listener + '-' + bias + '.png')
 
 if __name__ == '__main__':
 
     parser = argparse.ArgumentParser(description='make 3x3 conditional probability probs for LL/PL')
-    parser.add_argument('lt', type=str, help='LL/PL')
-    parser.add_argument('--fn', type=str, default='', help='path to folder containing evs-conditioned.csv and evs-marginal.csv')
+    parser.add_argument('lt', type=str, help='LL/PL/prior')
+    parser.add_argument('--fn', type=str, default='', help='path to base folder containing alpha-"alpha"/"lt"/ folder with evs-marginal/conditional-n_runs-"nruns".csv')
+    parser.add_argument('--nruns', type=int, default=3, help='file with average computed from this number of runs')
+    parser.add_argument('--alpha', type=int, default=5, help='speaker optimality value alpha that was used')
 	
     args = parser.parse_args()
     if args.fn:
-      fn_conditioned = args.fn + 'evs-conditioned.csv'
-      fn_marginal = args.fn + 'evs-marginal.csv'
+      fn_conditioned = args.fn + 'evs-conditioned-n_runs-' + str(args.nruns) + '.csv'
+      fn_marginal = args.fn + 'evs-marginal-n_runs-' + str(args.nruns) + '.csv'
     else: 
-      fn_conditioned = './../rwebppl/results-all-biases/' + args.lt + '/evs-conditioned.csv'
-      fn_marginal = './../rwebppl/results-all-biases/' + args.lt + '/evs-marginal.csv'
+      if args.lt=='PL':
+        base = './../rwebppl/results-all-biases/alpha-' + str(args.alpha)
+      else:
+        base = './../rwebppl/results-all-biases'
 
-    tablePlots(fn_conditioned, fn_marginal, args.lt)
+      fn_conditioned = base + '/' + args.lt + '/evs-conditioned-n_runs-' + str(args.nruns) + '.csv'
+      fn_marginal = base + '/' + args.lt + '/evs-marginal-n_runs-' + str(args.nruns) + '.csv'
+
+    print('retrieve data from: ' + fn_conditioned) 
+    print('retrieve data from: ' + fn_marginal)
+    tablePlots(fn_conditioned, fn_marginal, args.lt, args.alpha)
 
 
 
