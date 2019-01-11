@@ -153,7 +153,7 @@ conditionedEVs <- function(listener_df){
 
 ##### save, read data ###### 
 saveResults <- function(results, bias, n_runs, target_dir){
-  pdf(paste(target_dir, bias, "-", n_runs, "-runs", sep=""))
+  pdf(paste(target_dir, bias, "-", n_runs, "-runs.pdf", sep=""))
   grid.newpage()
   grid.table(t(results))
   dev.off()

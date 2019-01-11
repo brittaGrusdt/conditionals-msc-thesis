@@ -87,9 +87,7 @@ runSpeakerQimp <- function(bias){
   best.first <- data.frame()
   best.second <- data.frame()
   best.third <- data.frame()
-  p1 <- 0
-  p2 <- 0
-  p3 <- 0
+  p1 <- 0; p2 <- 0; p3 <- 0
   for(i in seq(1,length(likelihoods))){
     df <- as.data.frame(likelihoods[i])
     df2 <- df[order(df$p,decreasing=T),]
@@ -104,20 +102,30 @@ runSpeakerQimp <- function(bias){
   p2 <- p2/length(likelihoods)
   p3 <- p3/length(likelihoods)
   
-  ggplot(best.first, aes(x=utt)) +
-    geom_bar(aes(y =..count..),fill="magenta") +
+  best.first.summary <- aggregate(p ~ utt, best.first, mean )
+  best.first.summary$utt <- factor(best.first.summary$utt, levels = 
+                                     best.first.summary$utt[order(-best.first.summary$p)])
+  best.second.summary <- aggregate(p ~ utt, best.second, mean )
+  best.second.summary$utt <- factor(best.second.summary$utt, levels = 
+                                     best.second.summary$utt[order(-best.second.summary$p)])
+  best.third.summary <- aggregate(p ~ utt, best.third, mean )
+  best.third.summary$utt <- factor(best.third.summary$utt, levels = 
+                                     best.third.summary$utt[order(-best.third.summary$p)])
+  
+  ggplot(best.first.summary, aes(x=utt, y=p)) +
+    geom_bar(stat="identity", fill="magenta") +
     theme(text = element_text(size=6)) +
-    ylab('') + xlab('')
+    ylab('') + xlab('') 
   ggsave(paste(target_dir, "first-best-utts-", bias, "-qud-", qud,".png", sep=""), width = 3, height=2)
   
-  ggplot(best.second, aes(x=utt)) +
-    geom_bar(aes(y =..count..),fill="orange") +
+  ggplot(best.second.summary, aes(x=utt,y=p)) +
+    geom_bar(stat="identity",fill="orange") +
     theme(text = element_text(size=6)) +
     ylab('') + xlab('')
   ggsave(paste(target_dir, "second-best-utts-", bias, "-qud-", qud,".png", sep=""), width = 3, height=2)
   
-  ggplot(best.third, aes(x=utt)) +
-    geom_bar(aes(y =..count..),fill="red") +
+  ggplot(best.third.summary, aes(x=utt,y=p)) +
+    geom_bar(stat="identity",fill="red") +
     theme(text = element_text(size=6)) +
     ylab('') + xlab('')
   ggsave(paste(target_dir, "third-best-utts-", bias, "-qud-", qud,".png", sep=""), width = 3, height=2)
