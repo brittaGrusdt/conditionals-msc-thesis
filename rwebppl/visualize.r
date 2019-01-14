@@ -23,7 +23,7 @@ plotPC_PA <- function(bias, fn, ll_posterior, pl_posterior){
     geom_density() +
     geom_vline(data=mu_pa, aes(xintercept=grp.mean, color=lt), linetype="dashed") +
     labs(x = "P(A)")
-  ggsave(paste("./", fn, "/plots/", bias, "-pa.png", sep=""), width = 3, height=2.5)
+  ggsave(paste("./", fn, "/joint-plots-LL-PL/", bias, "-pa.png", sep=""), width = 3, height=2.5)
 }
 
 plotPerfectionProbs <- function(bias, fn, ll_posterior, pl_posterior){
@@ -61,13 +61,13 @@ plotPerfectionProbs <- function(bias, fn, ll_posterior, pl_posterior){
     geom_density(aes(color=variable),show.legend = FALSE, alpha = 0.4) +
     xlab('')  + theme(text = element_text(size=10)) +
     facet_wrap( ~ variable, scales="free_y")
-  ggsave(paste(fn, "/plots/", bias, "-cp-densities-LL.png", sep=""), width = 3, height=3)
+  ggsave(paste(fn, "/joint-plots-LL-PL/", bias, "-cp-densities-LL.png", sep=""), width = 3, height=3)
   
   ggplot(data = df2.long.pl, aes(x=value)) +
     geom_density(aes(color=variable),show.legend = FALSE, alpha = 0.4) +
     xlab('') + ylab('') + theme(text = element_text(size=10)) +
     facet_wrap( ~ variable, scales="free_y")
-  ggsave(paste(fn, "/plots/", bias, "-cp-densities-PL.png", sep=""), width = 3, height=3)
+  ggsave(paste(fn, "/joint-plots-LL-PL/", bias, "-cp-densities-PL.png", sep=""), width = 3, height=3)
 }
 
 plotCNs_LLPL <- function(bias, fn, ll_posterior, pl_posterior){
@@ -89,7 +89,7 @@ plotCNs_LLPL <- function(bias, fn, ll_posterior, pl_posterior){
     theme(text = element_text(size=10), axis.text.x = element_text(angle = 60, hjust = 1),
           legend.title=element_blank()) + 
     facet_wrap(~lt)
-  ggsave(paste(fn, "/plots/", bias, "-cns-LL-PL.png", sep=""), width = 5, height=3.5)
+  ggsave(paste(fn, "/joint-plots-LL-PL/", bias, "-cns-LL-PL.png", sep=""), width = 5, height=3.5)
 }
 
 ###### Plots for single distribuion #####
@@ -152,4 +152,41 @@ plotQUDs <- function(bias, fn, ll_posterior, pl_posterior){
     ggsave(paste(fn, "/plots/", bias, "-quds-PL.png", sep=""), width = 2, height=3)
   }
 }
+
+plotTableDensityPerCN <- function(cn, bias, lt, fn){
+  data <- readData(lt, bias, fn)
+  samples <- getSamples('PL', data)
+  keep <- c("pca","pcna","pnca","pncna", "cn")
+  data <- samples[keep]
+  df <- melt(data,id.vars="cn")
+  df2 <- df[which(df$cn==cn),]
+
+  if(dim(df2)[1]==0){
+    print(paste('cn', cn, 'has 0 probability - no output plot'))
+  }else{
+    evs <- aggregate(df2[,3], list(df2$variable), mean)
+    colnames(evs) <- c("variable","value")
+    ggplot(df2, aes(x=value, color=variable)) +
+      geom_density() +
+      geom_vline(data=evs, aes(xintercept=value), linetype="dashed") +
+      xlab("") + ylab("") +  ggtitle(cn) +
+      theme(legend.position='none', plot.title = element_text(size=8, hjust = 0.5),
+            text = element_text(size=7))+
+      
+      facet_wrap(~variable, ncol = 2, scales="free_y") 
+    
+    target <- paste(fn, "/", lt, "/plots/", bias, "-table-densities-", cn, ".png", sep="")
+    print(paste('target dir:', target))
+    ggsave(target, width = 2.75, height=2.5)
+  }
+}
+
+plotTableDensitiesAllCNs <- function(bias,lt,fn){
+  for(cn in CNs){
+    plotTableDensityPerCN(cn, bias, lt, fn)
+  }
+}
+
+
+
 
