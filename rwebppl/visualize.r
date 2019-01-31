@@ -17,7 +17,7 @@ plotPC_PA <- function(bias, fn, ll_posterior, pl_posterior){
     geom_density() +
     geom_vline(data=mu_pc, aes(xintercept=grp.mean, color=lt), linetype="dashed") +
     labs(x = "P(C)")
-  ggsave(paste("./", fn, "/plots/", bias, "-pc.png", sep=""), width = 3, height=2.5)
+  ggsave(paste("./", fn, "/joint-plots-LL-PL/", bias, "-pc.png", sep=""), width = 3, height=2.5)
   
   ggplot(df, aes(x=pa,color=lt)) +
     geom_density() +
@@ -46,7 +46,7 @@ plotPerfectionProbs <- function(bias, fn, ll_posterior, pl_posterior){
     theme(text = element_text(size=10), axis.text.x = element_text(angle = 60, hjust = 1),
           legend.title=element_blank()) +
     facet_wrap(~lt)
-  ggsave(paste(fn, "/plots/", bias, "-expValsCP-LL-PL.png", sep=""), width = 3, height=3)
+  ggsave(paste(fn, "/joint-plots-LL-PL/", bias, "-expValsCP-LL-PL.png", sep=""), width = 3, height=3)
   # Density plots of the 4 relevant conditional probabilities for PL and LL
   df2 <- df[,c(collist,"lt")]
   df2.long <- melt(df2,id.vars="lt")
@@ -108,7 +108,7 @@ plotTables <- function(probs, fn, bias, lt){
   
   ggplot(df, aes(x = val, color=entry)) +
     geom_density(show.legend = FALSE) +
-    theme(text = element_text(size=6)) +
+    theme(text = element_text(size=8)) +
     scale_x_continuous(breaks=c(0,0.5,1)) +
     ylab('') + xlab('') +
     geom_vline(aes(xintercept=val), data=df2, linetype="dashed", color="blue") +
@@ -138,7 +138,7 @@ plotCNs <- function(samples, fn, bias, lt){
 plotQUDs <- function(bias, fn, ll_posterior, pl_posterior){
   for(bias in BIASES){
     posterior <- readData('PL', bias, fn)
-    samples <- get_samples(posterior,10000)
+    samples <- get_samples(posterior,100000)
     x <- levels(factor(samples$qud))
     y <- table(samples$qud)
     y <- y/sum(y)
@@ -155,7 +155,7 @@ plotQUDs <- function(bias, fn, ll_posterior, pl_posterior){
 
 plotTableDensityPerCN <- function(cn, bias, lt, fn){
   data <- readData(lt, bias, fn)
-  samples <- getSamples('PL', data)
+  samples <- getSampleProbs(lt, data)
   keep <- c("pca","pcna","pnca","pncna", "cn")
   data <- samples[keep]
   df <- melt(data,id.vars="cn")
@@ -187,6 +187,137 @@ plotTableDensitiesAllCNs <- function(bias,lt,fn){
   }
 }
 
+#### Speaker Plots  #### 
+visualizeSpeakerFull <- function(bias){
+    target_dir <- "results-all-biases/speaker/"
+    data <- list(bias=bias, lt='speakerAll',utterance="dummy", qud=qud)
+    model <- paste(BASEDIR, "model.wppl", sep="")
+    likelihoods <- posterior_with_data_input(model, data, viz=FALSE, seed=SEEDS[1])
+  
+}
+visualizeSpeakerQimp <- function(bias){
+  target_dir <- "results-all-biases/speaker/"
+  qud <- "bn"
+  data <- list(bias=bias, lt='Q',utterance="dummy", qud=qud)
+  model <- paste(BASEDIR, "model.wppl", sep="")
+  likelihoods <- posterior_with_data_input(model, data, viz=FALSE, seed=SEEDS[1])
+  
+  best.first <- data.frame()
+  best.second <- data.frame()
+  best.third <- data.frame()
+  p1 <- 0; p2 <- 0; p3 <- 0
+  for(i in seq(1,length(likelihoods))){
+    df <- as.data.frame(likelihoods[i])
+    df2 <- df[order(df$p,decreasing=T),]
+    best.first <- rbind(best.first, df2[1,])
+    p1 <- p1 + df2[1,"p"]
+    best.second <- rbind(best.second, df2[2,])
+    p2 <- p2 + df2[2,"p"] + df2[1,"p"]
+    best.third <- rbind(best.third, df2[3,])
+    p3 <- p3 + df2[3,"p"] + df2[2,"p"] + df2[1,"p"]
+  }
+  p1 <- p1/length(likelihoods)
+  p2 <- p2/length(likelihoods)
+  p3 <- p3/length(likelihoods)
+  
+  best.first.summary <- aggregate(p ~ utt, best.first, mean )
+  best.first.summary$utt <- factor(best.first.summary$utt, levels = 
+                                     best.first.summary$utt[order(-best.first.summary$p)])
+  best.second.summary <- aggregate(p ~ utt, best.second, mean )
+  best.second.summary$utt <- factor(best.second.summary$utt, levels = 
+                                      best.second.summary$utt[order(-best.second.summary$p)])
+  best.third.summary <- aggregate(p ~ utt, best.third, mean )
+  best.third.summary$utt <- factor(best.third.summary$utt, levels = 
+                                     best.third.summary$utt[order(-best.third.summary$p)])
+  
+  ggplot(best.first.summary, aes(x=utt, y=p)) +
+    geom_bar(stat="identity", fill="magenta") +
+    theme(text = element_text(size=8)) +
+    ylab('') + xlab('') 
+  ggsave(paste(target_dir, "first-best-utts-", bias, "-qud-", qud,".png", sep=""), width = 3, height=2)
+  
+  ggplot(best.second.summary, aes(x=utt,y=p)) +
+    geom_bar(stat="identity",fill="orange") +
+    theme(text = element_text(size=8)) +
+    ylab('') + xlab('')
+  ggsave(paste(target_dir, "second-best-utts-", bias, "-qud-", qud,".png", sep=""), width = 3, height=2)
+  
+  ggplot(best.third.summary, aes(x=utt,y=p)) +
+    geom_bar(stat="identity",fill="red") +
+    theme(text = element_text(size=8)) +
+    ylab('') + xlab('')
+  ggsave(paste(target_dir, "third-best-utts-", bias, "-qud-", qud,".png", sep=""), width = 3, height=2)
+}
 
+visualizeSpeakerExpectations <- function(bias, qud){
+  model <- paste(BASEDIR, "model.wppl", sep="")
+  target_dir <- "results-all-biases/speaker/"
+  
+  data <- list(bias=bias, lt='SE',utterance='dummy', qud=qud)
+  likelihoods <- posterior_with_data_input(model, data, viz=FALSE, seed=SEEDS[1])
+  likelihoods.df <- as.data.frame(likelihoods)
+  colnames(likelihoods.df) <- c("Group.1", "x")
+  likelihoods.df$x <- unfactor(likelihoods.df$x)
+  saveRDS(likelihoods.df, paste(target_dir, "SE-", bias, "-qud-", qud,".rds", sep=""))
+  
+  ggplot(likelihoods.df, aes(x=reorder(Group.1,-x), y=x)) +
+    geom_bar(stat="identity",fill='steelblue') + 
+    scale_y_continuous(limits=c(0,0.3)) +
+    ylab('') +   xlab('') +
+    theme(text = element_text(size=10),
+          axis.text.x = element_text(angle = 60, hjust = 1))
+  ggsave(paste(target_dir, "SE-", bias, "-qud-", qud,".png", sep=""), width = 3, height=2)
+  return(likelihoods.df)
+}
+
+
+visualizeUtilities <- function(bias, alpha, fn){
+  prior <- readData("prior", bias, "results-all-biases")
+
+  # find specific bayes net
+  v1 <- lapply(prior$table, `[[`, 1); v2 <- lapply(prior$table, `[[`, 2)
+  v3 <- lapply(prior$table, `[[`, 3); v4 <- lapply(prior$table, `[[`, 4)
+  prior$t0 <- v1; prior$t1 <- v2
+  prior$t2 <- v3; prior$t3 <- v4
+  
+  # look_for <- c(0.024, 0.819,0.004, 0.153)
+  # look_for <- c(0.041, 0.001, 0.935, 0.023)
+  look_for <- c(0.001, 0.5, 0.479, 0.021)
+  idx1 <- which(prior$cn=="-C implies -A")
+  
+  idx2 <- which(prior$t0 == look_for[1])
+  idx3 <- which(prior$t1== look_for[2])
+  idx4 <- which(prior$t2== look_for[3])
+  idx5 <- which(prior$t3== look_for[4])
+  
+  idx <- intersect(intersect(intersect(idx2,idx3),idx4), idx5)
+  # idx <- intersect(intersect(intersect(intersect(idx1,idx2),idx3), idx4), idx5)
+  bn <- prior[idx,]
+  bn <- select(bn, "cn", "table")
+  
+  # Get speaker distribution
+  model_path <- paste(BASEDIR, "model.wppl", sep="")
+  data <- list(bias=bias, utterance="dummy", lt="speaker", bn=bn, alpha=alpha)
+  s1 <- posterior_with_data_input(model_path, data, FALSE, SEEDS[1])
+  
+  # replace factor(globalStore.alpha * (utility-costs(utterance))) by 
+  #         factor(globalStore.alpha * utility) in speaker code 
+  s2 <- posterior_with_data_input(model_path, data, FALSE, SEEDS[1])
+  
+  s1$support <- factor(s1$support, levels = s1$support[order(-s1$prob)])
+  s2$support <- factor(s2$support, levels = s2$support[order(-s2$prob)])
+  
+  ggplot(s1, aes(x=support, y=prob)) +
+    geom_bar(stat="identity", show.legend = FALSE, fill='indianred') +
+    xlab(paste("<", bn$table, ", ", bn$cn, ">", sep="")) + ylab('') +
+    theme(text = element_text(size=8), plot.title = element_text(size=8, hjust = 0.5)) 
+  ggsave(paste(fn, "/", bias, "-with-costs.png", sep=""), width=3.5, height=2)
+  
+  ggplot(s2, aes(x=support, y=prob)) +
+  geom_bar(stat="identity", show.legend = FALSE, fill='indianred') +
+    xlab(paste("<", bn$table, ", ", bn$cn, ">", sep="")) + ylab('')  +
+    theme(text = element_text(size=8), plot.title = element_text(size=8, hjust = 0.5)) 
+  ggsave(paste(fn, "/", bias, "-without-costs.png", sep=""),width=3.5, height=2)
+}
 
 
