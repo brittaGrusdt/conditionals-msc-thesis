@@ -65,9 +65,12 @@ var utteranceProbs = cache(function(utterance, table){
   utterance == "C but -A" ? table[1] : error("unknown utterance " + utterance)
   return p
 })
+
+var qudFns = {"bn": function(bn){return bn},
+              "table": function(bn){return bn.table}}
 ////////////  PRIORS  /////////////////
 var tablesPrior = mem(function(){
-  return Infer({method:'forward', samples:5000, model:function(){
+  return Infer({method:'forward', samples:10000, model:function(){
     var alpha = Vector(repeat(4, constF(0.25)));
     var vec = dirichlet({alpha})
     var table = Object.values(vec.data)
@@ -134,6 +137,9 @@ var qudPrior = Infer({method:'enumerate', model: function(){
   return categorical({vs: ['bn', 'table'], ps: [1,1]})}
 })
 
+// leaving utterance 'C but -A' out is necessary, when there are not enough
+// Bayes nets, such that there is no state where P(C,-A)>=theta
+// (for 10.000 tables, in ~0.15% this is the case)
 var utterancePrior = function(bias){
   var ps = bias.startsWith('lawn') ?
     map(function(u){
@@ -158,8 +164,9 @@ var literalListener = cache(function(utterance, qud, bias){
   Infer({method:'enumerate',model: function(){
     var bn = sample(bayesNetPrior(bias))
     condition(meaning(utterance, bn.table))
-    if(qud == 'table'){return bn.table}
-    else{return bn}
+    var qudFn = qudFns[qud]
+    var qudAns = qudFn(bn)
+    return qudAns
   }})
 }, 10000)
 
@@ -175,13 +182,11 @@ var costs = function(utt){
   return cost
 }
 
-var speaker = cache(function(bn, bias, qud, printU){
+var speaker = cache(function(state, bias, qud, printU){
   return Infer({method:'enumerate', model: function(){
     var utterance = sample(utterancePrior(bias))
     var LL = literalListener(utterance, qud, bias)
-    var utility = qud=='bn' ? LL.score(bn) :
-    qud=='table' ? LL.score(bn.table) :
-    error('unknown speaker qud: ' + qud)
+    var utility = LL.score(state)
     if(printU && utility!=-Infinity){
       print(utterance + utility)
     }
@@ -191,11 +196,15 @@ var speaker = cache(function(bn, bias, qud, printU){
  })
 }, 10000)
 
-var listener = function(utterance, bias, speakerQUD){
+
+var listener = function(utterance, speakerQUD, bias){
   return Infer({method:'enumerate', model:function(){
                   var bn = sample(bayesNetPrior(bias))
                   var qud = speakerQUD ? speakerQUD : sample(qudPrior)
-                  observe(speaker(bn, bias, qud, false),utterance)
+                  var qudFn = qudFns[qud]
+                  var qudAnswer = qudFn(bn)
+
+                  observe(speaker(qudAnswer, bias, qud, false),utterance)
                   return {qud, bn}
                 }})
 }
@@ -203,9 +212,11 @@ var listener = function(utterance, bias, speakerQUD){
 ////////////  For model analysis  /////////////////
 var speakerExpectation = function(n, qud, bias, utt){
   var bnsFromPrior = repeat(n, function(){return sample(bayesNetPrior(bias))})
+  var qudFn = qudFns[qud]
   var likelihoods = map(function(utt){
       return sum(map(function(bn){
-        var speakerBeliefs = speaker(bn, bias, qud, false)
+        var qudAnswer = qudFn(bn)
+        var speakerBeliefs = speaker(qudAnswer, bias, qud, false)
         var likelihood = Math.exp(speakerBeliefs.score(utt))
         return likelihood}, bnsFromPrior))/n
       }, utterances)
@@ -214,11 +225,13 @@ var speakerExpectation = function(n, qud, bias, utt){
 }
 
 var speakerQ_ifac_c = function(qud, bias){
+  var qudFn = qudFns[qud]
   var bns = repeat(1000, function(){return sample(bayesNetPrior(bias))})
   var filteredStates = filter(function(bn){pc(bn.table)>=thresholds.theta}, bns)
   display('# states: ' + filteredStates.length)
   var likelihoods = map(function(bn){
-        var speakerBeliefs = speaker(bn, bias, qud, false)
+        var qudAnswer = qudFn(bn)
+        var speakerBeliefs = speaker(qudAnswer, bias, qud, false)
         var ps = map(function(utt){
           return {'utt': utt, 'p':Math.exp(speakerBeliefs.score(utt))}
         }, utterances)
@@ -245,7 +258,7 @@ if(keys.includes("alpha")){
 
 
 // 1. joint distributions (run-across-biases.r)
-var posterior = lt=='PL' ? listener(utterance, bias) :
+var posterior = lt=='PL' ? listener(utterance, qud, bias) :
                lt=='LL' ? literalListener(utterance, "bn", bias) :
                lt=='SE' ? speakerExpectation(1000,qud, bias, utterance) :
                lt=='Q' ? speakerQ_ifac_c(qud, bias) :
