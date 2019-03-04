@@ -1,0 +1,360 @@
+---
+title: "conditionals visualizations"
+output:
+  pdf_document: default
+  html_document:
+    df_print: paged
+---
+```{r setup, message=FALSE, echo=FALSE}
+source("data-processing-functions.r")
+source("webppl-model.R")
+source("helpers.R")
+require(plyr)
+require(ggplot2)
+require(reshape2)
+require(gridExtra)
+
+create_target_dirs()
+ALPHA <- 5
+N_RUN <- 1
+```
+
+```{r plot_helper-functions, echo=FALSE}
+get_pc_pa_mus <- function(df){
+  mu_pc <- ddply(df, "lt", summarise, grp.mean=mean(pc))
+  mu_pa <- ddply(df, "lt", summarise, grp.mean=mean(pa))
+  
+  mu_pc$variable <- c("pc","pc")
+  mu_pa$variable <- c("pa","pa")
+  mus <- rbind(mu_pc,mu_pa)
+  return(mus)
+}
+```
+
+```{r plot_functions, message=FALSE, echo=FALSE}
+plot_pc_pa_facet_lt <- function(bias, alpha, n_run, lawn_theta=0.05, save=TRUE){
+  # ---- facet for LL and PL ----- #
+  df <- get_samples_LL_PL(bias, alpha, n_run, lawn_theta)
+  mus <- get_pc_pa_mus(df)
+  
+  df.long <-melt(df[,c("pc","pa","lt","cn")],id.vars=c("lt","cn"), measure.vars=c("pc","pa"))
+  p <- ggplot(df.long, aes(x=value,color=variable,fill=variable)) +
+       geom_density(alpha=.2) + facet_wrap(~lt, scales="free_y") + xlab('') +
+       geom_vline(data=mus, aes(xintercept=grp.mean, color=variable), linetype="dashed") +
+       theme(legend.title=element_blank(),text = element_text(size=8))
+  p
+  if(save){
+    fn <- get_filename(bias, "PL", alpha, n_run, lawn_theta)
+    target_dir <- paste("../plots/seed-", SEEDS[n_run], "/", sep="")
+    ggsave(paste(target_dir, fn, "-pc-pa-facet-lt.png", sep=""), width = 4, height=2.5)
+  }
+  return(p)
+}
+
+plot_pc_pa_facet_p <- function(bias, alpha, n_run, lawn_theta, save=TRUE){
+  # ----- facet for P(C) and P(A) ---- #
+  df <- get_samples_LL_PL(bias, alpha, n_run, lawn_theta)
+  mus <- get_pc_pa_mus(df)
+  
+  df.long <-melt(df[,c("pc","pa","lt","cn")],id.vars=c("lt","cn"), measure.vars=c("pc","pa"))
+  p <- ggplot(df.long, aes(x=value,color=lt)) +
+       geom_density() + facet_wrap(~variable, scales="free") + xlab('') +
+       theme(legend.title=element_blank(),text = element_text(size=8))
+       geom_vline(data=mus, aes(xintercept=grp.mean, color=lt), linetype="dashed")
+
+  p
+  if(save){
+    fn <- get_filename(bias, "PL", alpha, n_run, lawn_theta)
+    target_dir <- paste("../plots/seed-", SEEDS[n_run], "/", sep="")
+    ggsave(paste(target_dir, fn, "-pc-pa-facet-p.png",sep=""), width = 4, height=2.5)
+  }
+  return(p)
+}
+
+plotHist <- function(proposition, bias, lt, n_run, title, from, to, alpha=5, bins=20, save=TRUE){
+  samples <- read_data(bias, lt, n_run, alpha, lawn_theta)
+  
+  if(proposition=='A'){
+    indices_in_interval <- getInterval(samples$pa, from, to)
+    samplesInterval <- samples[indices_in_interval, ]
+    p <- ggplot(samplesInterval, aes(x=pa)) + 
+          geom_histogram(aes(y = ..count..), bins=bins) +
+          theme(text = element_text(size=8)) +
+          ggtitle(title) + 
+          xlab(paste(from, '< P(A) <', to))
+  }else if(proposition=='C'){
+    indices_in_interval <- getInterval(samples$pc, from, to)
+    samplesInterval <- samples[indices_in_interval, ]
+    p <- ggplot(samplesInterval, aes(x=pc)) + 
+        geom_histogram(aes(y = ..count..), bins=bins) +
+        theme(text = element_text(size=8)) +
+        ggtitle(title) + 
+        xlab(paste(from, '< P(C) <', to))
+  }else{
+    stop('proposition must be either "A" or "C"')
+  }
+  ratio_in_interval <- dim(samplesInterval)[1] / dim(samples)[1]
+  print(paste('ratio of samples inside interval:', ratio_in_interval))
+  
+  p
+  if(save){
+    target_dir <- paste("../plots/seed-", SEEDS[n_run], "/", sep="")
+    fn <- get_filename(bias, lt, alpha, n_run, lawn_theta)
+    ggsave(paste(target_dir, fn, "-hist-p", proposition, ".png", sep=""), width=3, height=3)
+  }
+  return(p)
+}
+
+plotTables <- function(bias, lt, n_run, alpha, lawn_theta=0.05, save=TRUE){
+  data_samples <- read_data(bias, lt, n_run, alpha, lawn_theta)
+  t0 <- data_samples$pca 
+  t1 <- data_samples$pcna
+  t2 <- data_samples$pnca
+  t3 <- data_samples$pncna
+  df <- melt(data.frame(t0=t0,t1,t2,t3))
+  colnames(df) <- c("entry", "val")
+  
+  labs <- c("P(-C,-A)","P(-C,A)","P(C,-A)","P(C,A)")
+  levels(df$entry) <- rev(labs)
+  m <- aggregate(df[, "val"], list(df$entry), mean)
+  df2 <- data.frame(entry=levels(df$entry), val=m$x)
+  
+  p <- ggplot(df, aes(x = val, color=entry)) +
+        geom_density(show.legend = FALSE) +
+        theme(text = element_text(size=8)) +
+        scale_x_continuous(breaks=c(0,0.5,1)) +
+        # ylab('density') + xlab('joint probability table entries') +
+        geom_vline(aes(xintercept=val), data=df2, linetype="dashed", color="blue") +
+        facet_wrap(~entry,scales="free_y")
+  p
+  if(save){
+    target_dir <- paste("../plots/seed-", SEEDS[n_run], "/", sep="")
+    fn <- get_filename(bias, lt, alpha, n_run, lawn_theta)
+    ggsave(paste(target_dir, fn, "-tables.png", sep=""), width=3, height=3)
+  }
+  return(p)
+}
+
+plotCNs <- function(bias, lt, n_run, alpha, lawn_theta=0.05, save=TRUE){
+  data_samples <- read_data(bias, lt, n_run, alpha, lawn_theta)
+  
+  df <- as.data.frame(data_samples$cn)
+  df <- count(df)
+  df$freq <- round(x=df$freq / sum(df$freq),digits=2)
+  colnames(df)
+  
+  p <- ggplot(df, aes(x=data_samples.cn, y=freq)) +
+        geom_bar(stat="identity", show.legend = FALSE, fill="blue") +
+        geom_text(aes(label=freq), vjust = -0.4, size=2.5) +
+        xlab('') + ylab('') + 
+        theme(text = element_text(size=10), axis.text.x = element_text(angle = 60, hjust = 1),
+              legend.title=element_blank())
+  p
+  if(save){
+    target_dir <- paste("../plots/seed-", SEEDS[n_run], "/", sep="")
+    fn <- get_filename(bias, lt, alpha, n_run, lawn_theta)
+    ggsave(paste(target_dir, fn, "-cns.png", sep=""), width=5, height=3.5)
+  }
+  return(p)
+}
+
+plotCNs_LLPL <- function(bias, alpha, n_run, lawn_theta=0.05, save=TRUE){
+  df <- get_samples_LL_PL(bias, alpha, n_run, lawn_theta)
+  ll_cn <- as.data.frame(table(filter(df, lt=='LL')$cn))
+  ll_cn$lt <- rep("LL", nrow(ll_cn))
+  ll_cn$Freq <- round(x=ll_cn$Freq / sum(ll_cn$Freq), digits=2)
+  
+  pl_cn <- as.data.frame(table(filter(df, lt=='PL')$cn))
+  pl_cn$lt <- rep("PL", nrow(pl_cn))
+  pl_cn$Freq <- round(x=pl_cn$Freq / sum(pl_cn$Freq),digits=2)
+  data <- rbind(ll_cn,pl_cn)
+  
+  p <- ggplot(data, aes(x=Var1, y=Freq, fill=factor(lt))) +
+        geom_bar(stat="identity", position="dodge", show.legend = FALSE) +
+        geom_text(aes(label=Freq), vjust = -0.4, size=2.5) +
+        xlab('') + ylab('') + 
+        theme(text = element_text(size=10), axis.text.x = element_text(angle = 60, hjust = 1),
+              legend.title=element_blank()) + 
+        facet_wrap(~lt)
+  
+  p
+  if(save){
+    target_dir <- paste("../plots/seed-", SEEDS[n_run], "/", sep="")
+    fn <- get_filename(bias, "PL", alpha, n_run, lawn_theta)
+    ggsave(paste(target_dir, fn, "-facet-lt-cns.png", sep=""), width=5, height=3.5)
+  }
+  return(p)
+}
+
+plotTableDensityAllCNs <- function(bias, lt, n_run, alpha, lawn_theta=0.05, save=TRUE){
+  data_samples <- read_data(bias, lt, n_run, alpha, lawn_theta)
+
+  keep <- c("pca","pcna","pnca","pncna", "cn")
+  data <- data_samples[keep]
+  df <- melt(data,id.vars="cn")
+  p <- list(); i <- 1
+  for(cn in CNs){
+    print(cn)
+    marginalsCN <- as.data.frame(prop.table(table(df$cn)))
+    idx <- which(marginalsCN$Var1==cn)
+    df2 <- df[which(df$cn==cn),]
+  
+    if(dim(df2)[1]==0){
+      print(paste('cn', cn, 'has 0 probability - no output plot'))
+    }else{
+      marginal <- format(marginalsCN[idx, "Freq"], digits=2)
+      evs <- aggregate(df2[,3], list(df2$variable), mean)
+      colnames(evs) <- c("variable","value")
+      p[[i]] <- ggplot(df2, aes(x=value, color=variable)) +
+        geom_density() +
+        geom_vline(data=evs, aes(xintercept=value), linetype="dashed") +
+        xlab("") + ylab("") +  ggtitle(paste(cn, " (", marginal, ")", sep="")) +
+        theme(legend.position='none', plot.title = element_text(size=8, hjust = 0.5),
+              text = element_text(size=8)) +
+        facet_wrap(~variable, ncol = 2, scales="free_y") 
+      i <- i + 1
+    }
+  }
+  g <- do.call(arrangeGrob, c(p, top=paste(bias,lt,sep="-")))  
+  if(save){
+    target_dir <- paste("../plots/seed-", SEEDS[n_run], "/", sep="")
+    fn <- get_filename(bias, lt, alpha, n_run, lawn_theta)
+    target <- paste(target_dir, fn, "-table-densities.png", sep="")
+    ggsave(file=target, g, width=5.5, height=7)
+  }
+  return(g)
+}
+
+plotConditionalProbsDensities <- function(which_densities, bias, lt, n_run, alpha, lawn_theta=0.05){
+  df <- read_data(bias, lt, n_run, alpha, lawn_theta)
+  
+  # Density plots of conditional probabilities for PL and LL
+  if(which_densities=='cp'){
+    collist <- c('pAgivenC', 'pNCgivenNA')
+    labelsEV <- c("E[P(A|C)]", "E[P(-C|-A)]")
+    labelsDensity <- c("P(A|C)", "P(-C|-A)")
+  }else{
+    collist <- c('pCgivenA', 'pNAgivenNC')
+    labelsEV <- c("E[P(C|A)]", "E[P(-A|-C)]")
+    labelsDensity <- c("P(C|A)", "P(-A|-C)")
+  }
+  
+  df2 <- df[,c(collist,"lt")]
+  df2.long <- melt(df2,id.vars="lt")
+  df2.long$variable <- mapvalues(df2.long$variable, from = collist, to = labelsDensity)
+  data <- df2.long[which(df2.long$lt==lt),]
+  
+  target_dir <- paste("../plots/seed-", SEEDS[n_run], "/", sep="")
+  fn <- get_filename(bias, lt, alpha, n_run, lawn_theta)
+  target <- paste(target_dir, fn, "-cp-densities.png", sep="")
+  
+  p <- ggplot(data = data, aes(x=value)) +
+        geom_density(aes(color=variable), alpha = 0.4, show.legend = FALSE) +
+        xlab('')  + theme(text = element_text(size=8), legend.title=element_blank()) +
+        facet_wrap( ~ variable, scales="free_y")
+  
+  ggsave(file=target, p, width=4, height=2.5)
+  return(p)  
+}
+```
+
+
+```{r speaker-plots-functions, echo=FALSE, message=FALSE}
+visualizeSpeakerExpectation <- function(condition, bias, alpha, n_run, lawn_theta=0.05, save=TRUE){
+  data_dir <- paste("../data/seed-", SEEDS[n_run], "/", sep="")
+  fn <- get_filename(bias, "PL", alpha, n_run, lawn_theta)
+  target <- paste(data_dir, fn, "-SE-", condition, ".rds", sep="")
+  df <- readRDS(target)
+      
+  p <- ggplot(df, aes(x=reorder(Group.1,-x), y=x)) +
+        geom_bar(stat="identity",fill='steelblue') +
+        ylab('') +   xlab('') +
+        geom_text(aes(label=x), vjust = -0.4, size=2) +
+        theme(text = element_text(size=8),
+            axis.text.x = element_text(angle = 60, hjust = 1))
+  p    
+  if(save){
+    target_dir <- paste("../plots/seed-", SEEDS[n_run], "/", sep="")
+    fn <- get_filename(bias, "PL", alpha, n_run, lawn_theta)
+    ggsave(paste(target_dir, fn, "-SE-", condition, ".png", sep=""), width = 3.5, height=3)
+  }
+  return(p)
+}
+```
+
+
+Plot distributions P(C) and P(A) for the literal and the pragmatic listener respectively without assuming any particular bias for the utterance *If A, C*. 
+
+```{r Uncertainty_A_C_1}
+plot_pc_pa_facet_lt("none", ALPHA, N_RUN)
+```
+
+Plot histograms for P<sub>PL</sub>(A) and P<sub>PL</sub>(C) in interval (0.1,0.9).
+
+```{r Uncertainty_A_C_2}
+plotHist("A", "none", "PL", N_RUN, "Pragmatic Listener", 0.1, 0.9, ALPHA)
+plotHist("C", "none", "PL", N_RUN, "Pragmatic Listener", 0.1, 0.9, ALPHA)
+```
+
+Sample 1000 Bayes nets from the prior distribution: once with prior conditioned on P(C,A)>=theta, once with prior conditioned on P(C,¬A)>=theta and once with prior conditioned on P(C)>=theta, but P(C,A) and P(C,¬A) both < theta.
+For each of these Bayes nets, consider P<sub>S</sub>.
+
+```{r speaker}
+visualizeSpeakerExpectation("pca", "none", ALPHA, N_RUN)
+visualizeSpeakerExpectation("pcna", "none", ALPHA, N_RUN)
+visualizeSpeakerExpectation("pc", "none", ALPHA, N_RUN)
+visualizeSpeakerExpectation("pnc", "none", ALPHA, N_RUN)
+```
+
+Plot prior distribution for each entry of the probability tables.
+
+```{r prior1, message=FALSE}
+plotTables("none", "prior", 1, ALPHA)
+```
+
+Plot distribution for each entry of the probability tables for the literal listener.
+
+```{r prior2, message=FALSE}
+plotTables("none", "LL", N_RUN, ALPHA)
+```
+Plot Histograms of P(C)-samples from prior and from the literal listener. 
+
+```{r indicatives-histograms}
+plotHist("C", "none", "prior", N_RUN, "Pragmatic Listener", 0, 1, ALPHA)
+plotHist("C", "none", "LL", N_RUN, "Pragmatic Listener", 0, 1, ALPHA)
+
+```
+
+Plot distributions over causal networks for the literal and the pragmatic listener.
+
+```{r indicatives-cns}
+plotCNs_LLPL("none", ALPHA, N_RUN)
+```
+
+# Biscuit conditionals
+
+```{r Biscuit_Conditionals}
+plot_pc_pa_facet_p("pizza", 5, 1)
+```
+
+# CONDITIONAL PERFECTION
+
+```{r Conditional-Perfection}
+plotCNs_LLPL("lawn", ALPHA, N_RUN)
+plotConditionalProbsDensities("cp", "lawn", "PL", N_RUN, ALPHA)
+plotConditionalProbsDensities("cp", "lawn", "LL", N_RUN, ALPHA)
+```
+
+```{r Indicative-conditionals-context, message=FALSE}
+plot_pc_pa_facet_lt("douven1", ALPHA, N_RUN)
+plotCNs_LLPL("douven1", ALPHA, N_RUN)
+visualizeSpeakerExpectation("no-condition", "douven1", ALPHA, N_RUN)
+```
+
+## Discussion
+Plot distribution for each table entry conditioned on each causal network.
+
+```{r discussion, message=FALSE}
+plotTableDensityAllCNs("none", "PL", 1, 5)
+```
+
