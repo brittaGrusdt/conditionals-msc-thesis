@@ -1,15 +1,17 @@
 ////////////  SET PARAMETERS  /////////////////
 globalStore.alpha = 5
-var thresholds = {t: 0.9, f: 0.05, likely: 0.7, theta: 0.9, theta_maybe: 0.5}
+globalStore.thetaCP = 0.05
+var thresholds = {t: 0.9, f: 0.05, likely: 0.7, theta: 0.9, theta_likely: 0.5}
+
 var literals = ["A", "C", "-A", "-C"]
 var conditionals = ["If A, C", "If A, -C", "If -A, C", "If -A, -C",
                     "If C, A", "If C, -A", "If -C, A", "If -C, -A"]
-var maybe = map(function(u){return "maybe ".concat(u)},
+var likely = map(function(u){return "likely ".concat(u)},
                 literals)
 
 var utteranceDict = {'literals': literals,
                      'if' : conditionals,
-                     'maybe': maybe,
+                     'likely': likely,
                      'conj' : ["A and C", "C but -A", "A but -C", "neither A nor C"],
                     }
 var utterances = reduce(function(utts,acc){acc.concat(utts)},[],
@@ -22,12 +24,14 @@ var causalNets = independentNets.concat(dependentNets)
 
 var params = {'none_p_ind': 1/2,
              'lawn_p_ind': 1/2,
+             'lawn-cond_p_ind': 1/2,
              'pizza_p_ind': 1,
              'douven1_p_ind': 0.98}
 
 ////////////  HELPERS  /////////////////
-var roundTo3 = function(x){
-  return Math.round(x*1000)/1000
+var roundToN = function(x, n){
+  var m = Math.pow(10,n)
+  return Math.round(x*m)/m
 }
 // marginal probabilities
 var pa = function(x){return x[0]+x[2]}
@@ -44,10 +48,10 @@ var pCgivenNA = function(x){return x[1]/pna(x)}
 
 var utteranceProbs = cache(function(utterance, table){
   var p =
-  utterance == "A" || utterance == 'maybe A' ? pa(table) :
-  utterance == "C" || utterance == 'maybe C'? pc(table) :
-  utterance == "-A" || utterance == 'maybe -A' ? pna(table) :
-  utterance == "-C" || utterance == 'maybe -C' ? pnc(table) :
+  utterance == "A" || utterance == 'likely A' ? pa(table) :
+  utterance == "C" || utterance == 'likely C'? pc(table) :
+  utterance == "-A" || utterance == 'likely -A' ? pna(table) :
+  utterance == "-C" || utterance == 'likely -C' ? pnc(table) :
   utterance == "If A, C" ? table[0]/pa(table) :
   utterance == "If A, -C" ? table[2]/pa(table) :
   utterance == "If -A, C" ? table[1] / pna(table) :
@@ -64,10 +68,11 @@ var utteranceProbs = cache(function(utterance, table){
 })
 ////////////  PRIORS  /////////////////
 var tablesPrior = mem(function(){
-  return Infer({method:'forward', samples:5000, model:function(){
+  return Infer({method:'forward', samples:10000, model:function(){
     var alpha = Vector(repeat(4, constF(0.25)));
     var vec = dirichlet({alpha})
     var table = Object.values(vec.data)
+    // var table = map2(roundToN, table, [4,4,4,4])
     return table
 }})})
 
@@ -108,34 +113,28 @@ var bayesNetPrior = cache(function(bias){
     var table = uniformDraw(tables)
     var cn = networkPrior(bias)
     factor(logLikelihood(table, cn))
+
     // condition(table[2]<=0.1) // just for plot
     if(bias=='lawn'){
-      if(table[1]<=thresholds.f){factor(-Math.log(thresholds.f))}
+      if(table[1]<=globalStore.thetaCP){
+        factor(-Math.log(thresholds.f))
+      }
+    }else if(bias=='lawn-cond'){
+      if(pCgivenNA(table)<=globalStore.thetaCP){
+        factor(-Math.log(thresholds.f))
+      }
     }else if(bias=='douven1'){
       if(pc(table)>=thresholds.likely){factor(-Math.log(thresholds.f))}
     }
-    return {"cn": cn, "table": table}
+    return {cn, table}
   }})
 })
-
-var utterancePrior = function(bias){
-  var ps = bias.startsWith('lawn') ?
-    map(function(u){
-      var p =  (u!='C but -A') ? 1/(utterances.length-1) : 0
-      return p
-    }, utterances) : repeat(utterances.length,function(){return 1/utterances.length})
-
-  return Infer({method:'enumerate', model:function(){
-    var u = categorical({vs:utterances, ps:ps})
-    return u
-  }})
-}
 
 ////////////  MODEL  /////////////////
 var meaning = cache(function(utterance, table, cn){
  var p = utteranceProbs(utterance, table)
- var p_holds = utterance.includes('maybe') ?
-     (p >= thresholds.theta_maybe) : p >= thresholds.theta
+ var p_holds = utterance.includes('likely') ?
+     (p >= thresholds.theta_likely) : p >= thresholds.theta
  return p_holds
 })
 
@@ -153,7 +152,7 @@ var costs = function(utt){
   var c2 = utt.includes('and') || utt.includes('but') ? 0.25 : 0
   var c3 = utt.includes('not A') ? 0.125 : 0
   var c4 = utt.includes('not C') ? 0.125 : 0
-  var c5 = utt.includes('maybe') ? 0.1 : 0
+  var c5 = utt.includes('likely') ? 0.1 : 0
   var cost = c1 + c2 + c3 + c4 + c5
 
   return cost
@@ -161,13 +160,14 @@ var costs = function(utt){
 
 var speaker = cache(function(bn, bias, printU){
   return Infer({method:'enumerate', model: function(){
-    var utterance = sample(utterancePrior(bias))
+    var utterance = uniformDraw(utterances)
     var LL = literalListener(utterance, bias)
     var utility = LL.score(bn)
     if(printU && utility!=-Infinity){
       print(utterance + utility)
     }
     factor(globalStore.alpha * (utility - costs(utterance)))
+    // factor(globalStore.alpha * utility)
     return utterance
   }
  })
@@ -177,36 +177,45 @@ var listener = function(utterance, bias){
   return Infer({method:'enumerate', model:function(){
                   var bn = sample(bayesNetPrior(bias))
                   observe(speaker(bn, bias, false),utterance)
-                  return {bn}
+                  return {bn} //vorher hatte ich noch qud drin, so gelassen wegen analyse
                 }})
 }
 
 ////////////  For model analysis  /////////////////
-var speakerExpectation = function(n, bias, utt){
-  var bnsFromPrior = repeat(n, function(){return sample(bayesNetPrior(bias))})
+var qConditions = {
+  "pnc": function(bn){return pc(bn.table)<thresholds.theta},
+  "pc": function(bn){return pc(bn.table)>=thresholds.theta &&
+                            bn.table[0]<thresholds.theta &&
+                            bn.table[1]<thresholds.theta},
+  "pca": function(bn){return bn.table[0]>=thresholds.theta},
+  "pcna": function(bn){return bn.table[1]>=thresholds.theta},
+  "no-condition": function(bn){return true}
+}
+
+var speakerExpectations = function(n, bias, cond){
+  var prior = bayesNetPrior(bias)
+  var prior = Infer({method:'enumerate', model:function(){
+    var bn = sample(prior)
+
+    var condFn = qConditions[cond]
+    var condHolds = condFn(bn)
+    condition(condHolds)
+
+    return bn
+  }})
+  display('# states in prior support: ' +  prior.support().length)
+  display("sample BNs...")
+  var bns = repeat(n, function(){return sample(prior)})
+  display('# states: ' + bns.length)
+
   var likelihoods = map(function(utt){
       return sum(map(function(bn){
         var speakerBeliefs = speaker(bn, bias, false)
         var likelihood = Math.exp(speakerBeliefs.score(utt))
-        return likelihood}, bnsFromPrior))/n
+        return likelihood}, bns))/n
       }, utterances)
 
   return zip(utterances, likelihoods)
-}
-
-var speakerQ_ifac_c = function(bias){
-  var bns = repeat(1000, function(){return sample(bayesNetPrior(bias))})
-  var filteredStates = filter(function(bn){pc(bn.table)>=thresholds.theta}, bns)
-  display('# states: ' + filteredStates.length)
-  var likelihoods = map(function(bn){
-        var speakerBeliefs = speaker(bn, bias, false)
-        var ps = map(function(utt){
-          return {'utt': utt, 'p':Math.exp(speakerBeliefs.score(utt))}
-        }, utterances)
-
-        return ps}, filteredStates)
-
-  return likelihoods
 }
 
 ////////////  For running with R-script  /////////////////
@@ -220,14 +229,18 @@ if(keys.includes("alpha")){
   globalStore.alpha=myDF["alpha"][0]
   display('alpha: ' + globalStore.alpha)
 }
-
+if(keys.includes("thetaCP")){
+  globalStore.thetaCP = myDF["thetaCP"][0]
+}
+display('theta CP: ' + globalStore.thetaCP)
 
 // 1. joint distributions (run-across-biases.r)
 var posterior = lt=='PL'    ? listener(utterance, bias) :
                 lt=='LL'    ? literalListener(utterance, bias) :
-                lt=='SE'    ? speakerExpectation(1000, bias, utterance) :
-                lt=='Q'     ? speakerQ_ifac_c(bias) :
+                lt=='SE'     ? speakerExpectations(1000, bias, myDF["condition"][0]) :
                 lt=='prior' ? bayesNetPrior(bias) :
+                lt=='tablePrior' ? tablesPrior() :
+                lt=='speaker' ? speaker(myDF["bn"][0], bias, false) :
                   error('unknown listener type: ' + lt)
 
 posterior
