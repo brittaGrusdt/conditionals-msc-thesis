@@ -10,9 +10,9 @@ create_target_dirs <- function(which_data, runs=seq(1,3)){
 
 get_target_dir <- function(which_data, n_run=1){
   if(which_data=="data-model"){
-    dir <- paste("../data/seed-", SEEDS[n_run], "model/", sep="")
+    dir <- paste("../data/seed-", SEEDS[n_run], "/model/", sep="")
   }else if(which_data=="data-samples"){
-    dir <- paste("../data/seed-", SEEDS[n_run], "samples/", sep="")
+    dir <- paste("../data/seed-", SEEDS[n_run], "/samples/", sep="")
   }else{
     dir <- paste("../plots/seed-", SEEDS[n_run], "/", sep="")
   }
