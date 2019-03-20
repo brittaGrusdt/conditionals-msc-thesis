@@ -38,7 +38,7 @@ var pCgivenNA = function(x){return x[1]/pna(x)}
 
 ////////////  PRIORS  /////////////////
 var tablesPrior = mem(function(){
-  return Infer({method:'forward', samples:10000, model:function(){
+  return Infer({method:'forward', samples:1000, model:function(){
     var alpha = Vector(repeat(4, constF(0.25)));
     var vec = dirichlet({alpha})
     var table = Object.values(vec.data)
@@ -91,6 +91,7 @@ var bayesNetPrior = cache(function(bias, conditioned_on){
 })
 
 viz(repeat(1000, function(){networkPrior(bias)}))
+
 viz(marginalize(bayesNetPrior(bias), "cn"))
 
 
@@ -101,6 +102,7 @@ viz(marginalize(bayesNetPrior(bias), "cn"))
 // conditioned on various causal networks (see above for their definition)
 
 var cn = "A implies C"
+// var cn = "A ind. C"
 var bn = sample(bayesNetPrior(bias, cn))
 
 print('cn: '  + bn["cn"])

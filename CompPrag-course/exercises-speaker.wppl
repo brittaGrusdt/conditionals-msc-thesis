@@ -1,6 +1,7 @@
 ////////////  SET PARAMETERS  /////////////////
 globalStore.alpha = 5
 globalStore.thetaCP = 0.05
+var nbTables = 1000
 var thresholds = {t: 0.9, f: 0.05, likely: 0.7, theta: 0.9, theta_likely: 0.5}
 
 var literals = ["A", "C", "-A", "-C"]
@@ -71,7 +72,7 @@ var utteranceProbs = cache(function(utterance, table){
 })
 ////////////  PRIORS  /////////////////
 var tablesPrior = mem(function(){
-  return Infer({method:'forward', samples:10000, model:function(){
+  return Infer({method:'forward', samples:nbTables, model:function(){
     var alpha = Vector(repeat(4, constF(0.25)));
     var vec = dirichlet({alpha})
     var table = Object.values(vec.data)
@@ -192,7 +193,8 @@ var utterance = "If A, C"
 
 // get a Bayes net with a particuar property
 var bnSupport = bayesNetPrior(bias).support()
-var bns = filter(function(bn){all(function(x){x<0.5}, bn["table"])},
+// var bns = filter(function(bn){all(function(x){x<0.5}, bn["table"])},
+var bns = filter(function(bn){bn["table"][1]>=0.9},
                  bnSupport)
 var bn = bns[0]
 
@@ -221,10 +223,13 @@ print('P(A): ' + pa(bn["table"]))
 viz(speaker(bn, bias, false))
 
 // EXERCISES
+// check out the costs: do you find a situation in which the speaker should say
+// something more expensive because it is more informative?
+
+// Check what happens if you increase the costs for that expensive utterance?
+
 // Check what happens when you remove some utterances, e.g. likely?
 // What would you guess?
 
 // Give the speaker bayes nets bayes nets with other properties than all table entries
 // being <  0.5.
-
-
