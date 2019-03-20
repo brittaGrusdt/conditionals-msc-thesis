@@ -1,0 +1,56 @@
+// Generate joint probability tables
+var nbSamples = 10000
+var tablesDist = mem(function(){
+  return Infer({method:'forward', samples:nbSamples, model:function(){
+    var alpha = Vector(repeat(4, constF(0.25)));
+    var vec = dirichlet({alpha})
+    var table = Object.values(vec.data)
+    return table
+}})})
+
+var tables = tablesDist().support()
+
+display("# generated tables:" + tables.length)
+
+// %%%%%%%%%%%% EXERCISES  %%%%%%%%%%%%
+// 1.1 visualize tables
+// get data of a single, specific table entry
+var idx = 0
+var tableEntriesAtIdx = map(function(t){return t[idx]}, tables)
+
+// apply map again to get 4 arrays
+// with i.th. array containing the i.th. table entry from all tables
+var allEntries = map()
+
+
+
+
+// visualization of each table entry in one run
+var _ = map(function(entries){viz(entries)}, allEntries)
+
+
+// 1.2 The following code prints the number of tables that pass the filter-condition
+// defined in *filterFunction*.
+// Try out different conditions for the filter, to get an idea of the generated set of tables.
+
+var filterFunction = function(t){
+  return t[0] > 0 && t[0] < 0.1
+}
+var filteredTables = filter(filterFunction, tables)
+display("# filtered tables: " + filteredTables.length)
+display("ratio: " + filteredTables.length/tables.length)
+
+
+
+
+// 1.3 Change the following code for the prior to get only (or strongly favour) tables where P(C) is
+// very small, say P(C)<0.05 ?
+var prior = Infer({model:function(){
+	var table = uniformDraw(tables)
+	return table
+}})
+
+
+var idx = 0
+viz(marginalize(prior, function(t){return t[idx]}))
+
