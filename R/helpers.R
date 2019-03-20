@@ -1,16 +1,22 @@
 source("constants.r")
 
-create_target_dirs <- function(){
-  for(i in c(1,2,3)){
-    target_plots <- paste("../plots/seed-", SEEDS[i], "/", sep="")
+create_target_dirs <- function(which_data, runs=seq(1,3)){
+  # which_data: plots, data-model, data-samples
+  for(i in runs){
+    target_plots <- get_target_dir(which_data, i)
     checkAndCreateDir(target_plots)
-    
-    target_data_model <- paste("../data/seed-", SEEDS[i], "/model/", sep="")
-    checkAndCreateDir(target_data_model)
-    
-    target_data_samples <- paste("../data/seed-", SEEDS[i], "/samples/", sep="")
-    checkAndCreateDir(target_data_samples)
   }
+}
+
+get_target_dir <- function(which_data, n_run=1){
+  if(which_data=="data-model"){
+    dir <- paste("../data/seed-", SEEDS[n_run], "model/", sep="")
+  }else if(which_data=="data-samples"){
+    dir <- paste("../data/seed-", SEEDS[n_run], "samples/", sep="")
+  }else{
+    dir <- paste("../plots/seed-", SEEDS[n_run], "/", sep="")
+  }
+  return(dir)
 }
   
 

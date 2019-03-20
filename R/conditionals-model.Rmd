@@ -7,9 +7,12 @@ output: html_notebook
 source("constants.r")
 source("data-processing-functions.r")
 source("webppl-model.R")
+source("helpers.R")
 library(rwebppl)
 
-create_target_dirs()
+create_target_dirs("plots")
+create_target_dirs("data-samples")
+create_target_dirs("data-models")
 ```
 
 ```{r run-model-function}
@@ -35,10 +38,9 @@ run_model <- function(lts, biases, alphas, n_runs=3, lawn_theta=0.05, bn_str='{t
           posterior <- webppl(webppl_model, random_seed=SEEDS[i])
           samples <- getSampleProbs(lt, posterior)
           
-          target_model <-  paste("../data/seed-", SEEDS[i], "/model/", sep="")
-          target_samples <-  paste("../data/seed-", SEEDS[i], "/samples/", sep="")
-  
-          checkAndCreateDir(target_model); checkAndCreateDir(target_samples)
+          target_model <-  get_target_dir("data-model", i)
+          target_samples <- get_target_dir("data-samples", i) 
+
           saveRDS(samples, paste(target_samples, fn, "-run-", i, "-samples.rds", sep=""))
           saveRDS(posterior, paste(target_model, fn, "-run-", i, "-model.rds", sep=""))
         }
@@ -75,11 +77,9 @@ runSpeakerExpectation <- function(conditions, bias, alpha, n_run=1, lawn_theta=0
 ```
 
 ```{r run-model}
-
 listenerTypes <- c("prior", "LL", "PL")
 biases <- c("none", "lawn", "pizza", "douven1")
 alphas = c(1, 3, 5, 10, 20)
-
 run_model(listenerTypes, biases, alphas)
 
 # Run model with bias=lawn with various bias thresholds
@@ -87,5 +87,19 @@ lawnThetas <- c(0.1, 0.2, 0.3, 0.4, 0.5)
 for(theta in lawnThetas){
   run_model(listenerTypes, c("lawn"), alphas, lawn_theta=theta)
 }
+
+# TEST
+listenerTypes <- c("prior", "LL", "PL")
+biases <- c("lawn") #, "lawn", "pizza", "douven1")
+alphas <- c(5)
+n_runs <- 1
+run_model(listenerTypes, biases, alphas, n_runs=1)
+
 ```
+
+```{r run-speaker-expectation}
+runSpeakerExpectation("no-condition", "douven1", 5)
+runSpeakerExpectation("no-condition", "none", 5)
+```
+
 
