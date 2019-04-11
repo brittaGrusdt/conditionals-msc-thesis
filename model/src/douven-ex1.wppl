@@ -1,0 +1,210 @@
+var thresholds = {theta: 0.9, theta_maybe: 0.5}
+globalStore.alpha = 5
+
+var literals = ["S", "-S", "R", "-R"]
+var conditionals = ["R>S", "R>-S", "-R>S",
+                   "S>-R", "-S>R"]
+var maybe = map(function(u){return "maybe ".concat(u)},
+                ["R", "-R", "S", "-S"])
+// var maybe = []
+var conjunctions = ["R and S", "-R and S", "R and -S"]//, "-R and -S"]
+// var conjunctions = []
+
+var utteranceDict = {'literals': literals,
+                     'if' : conditionals,
+                     'maybe': maybe,
+                     'conj' : conjunctions
+                    }
+var utterances = reduce(function(utts,acc){acc.concat(utts)},[],
+                        Object.values(utteranceDict))
+// var printU = map(function(u){print(u)}, utterances)
+
+// conditional and marginal Probabilities
+var p_wedding_inside = {"RT": 0,
+                       "R-T": 1,
+                       "-RT": 0,
+                       "-R-T": 0}
+var p_sundowners = {"W": 0, "-W": 1}
+var p_tents = [0, 0.5, 1]
+var p_rain = [0.1, 0.5, 0.9]
+// var p_rain = [0.5]
+
+// states
+var jointProbs = function(token, p_tents, p_rain){
+  var p_sw = token.includes("-WS") ? p_sundowners["-W"] :
+             token.includes("W-S") ? 1-p_sundowners["W"] :
+  error('token must contain -WS|W-S')
+
+  var r = token.includes("-R") ? "-R" : "R"
+  var t = token.includes("-T") ? "-T" : "T"
+  var wrt = p_wedding_inside[r+t]
+  var p_wrt = token.includes("-W") ? 1-wrt : wrt
+
+  var p_r = token.includes("-R") ? 1-p_rain : p_rain
+  var p_t = token.includes("-T") ? 1-p_tents : p_tents
+
+  return p_sw * p_wrt * p_r * p_t
+}
+
+var getCombis = function(arr1, arr2){
+  if(arr1.length==0){return []}
+  var first = arr1[0]
+  var new_combis = map(function(elem){return [first, elem]}, arr2)
+  var remaining = getCombis(arr1.slice(1), arr2)
+  return new_combis.concat(remaining)
+}
+
+var priors_tents_rain = getCombis(p_tents, p_rain)
+
+var states = map(function(priors){
+  return {"RTW-S": jointProbs("RTW-S", priors[0], priors[1]),
+          "RT-WS": jointProbs("RT-WS", priors[0], priors[1]),
+          "R-TW-S": jointProbs("R-TW-S", priors[0], priors[1]),
+          "R-T-WS": jointProbs("R-T-WS", priors[0], priors[1]),
+          "-RTW-S": jointProbs("-RTW-S", priors[0], priors[1]),
+          "-RT-WS": jointProbs("-RT-WS", priors[0], priors[1]),
+          "-R-TW-S": jointProbs("-R-TW-S", priors[0], priors[1]),
+          "-R-T-WS": jointProbs("-R-T-WS", priors[0], priors[1])
+         }
+}, priors_tents_rain)
+
+var statePrior = Infer({model:function(){uniformDraw(states)}})
+
+//compute probabilities
+var intersect_arrays = function(arrays){
+  return filter(function(m){
+        var m_in_all_lists = map(function(idx){arrays[idx].includes(m)},
+                                 _.range(1,arrays.length))
+        return sum(m_in_all_lists)==m_in_all_lists.length
+  }, arrays[0])
+}
+
+var marginal = function(state, variables){
+  var tokens = Object.keys(state)
+  var all_keys = map(function(v){
+    v.includes("-") ? filter(function(k){k.includes(v)}, tokens) :
+                      filter(function(k){!k.includes("-"+v)}, tokens)
+  }, variables)
+  var keys = intersect_arrays(all_keys)
+
+  return reduce(function(k, acc){acc + state[k]}, 0, keys)
+}
+
+var utteranceProbs = cache(function(utterance, state){
+  if(conditionals.includes(utterance)){
+    var components = utterance.split(">")
+    var antecedent = components[0]
+    var consequent = components[1]
+    return marginal(state, [antecedent, consequent])/marginal(state, [antecedent])
+  }
+  if(literals.includes(utterance)){return marginal(state, [utterance])}
+  if(maybe.includes(utterance)){
+    var u = utterance.slice("maybe ".length)
+    return marginal(state, [u])
+  }
+  if(conjunctions.includes(utterance)){
+    var components = utterance.split(" and ")
+    return marginal(state, components)
+  }
+  else{error("unknown utterance " + utterance)}
+  return p
+})
+
+// MODEL
+var meaning = cache(function(utterance, state){
+ var p = utteranceProbs(utterance, state)
+ var u_applicable = utterance.includes('maybe') ?
+     (p > thresholds.theta_maybe) : p >= thresholds.theta
+ return u_applicable
+})
+
+var literalListener = cache(function(utterance){
+  Infer({method:'enumerate',model: function(){
+    var state = sample(statePrior)
+    condition(meaning(utterance, state))
+    return state
+  }})
+}, 10000)
+
+var costs = function(utt){
+  if(!utterances.includes(utt)){error('unknown utterance ' + utt)}
+  var c1 = utt.includes('>') ? 0.55 : 0
+  var c2 = utt.includes('and') ? 0.25 : 0
+  var c3 = (utt.split('-').length-1) * 0.125
+  var c4 = utt.includes('maybe') ? 0.1 : 0
+  var cost = c1 + c2 + c3 + c4
+//   print('cost: ' + cost)
+  return cost
+}
+
+var speaker = cache(function(state){
+  return Infer({method:'enumerate', model: function(){
+    var utterance = uniformDraw(utterances)
+//     print('utt: ' + utterance)
+    var LL_score = literalListener(utterance).score(state)
+//     print('util:' + LL_score)
+    var utility = LL_score==-Infinity ? LL_score :
+                             globalStore.alpha * (LL_score-costs(utterance))
+//     print(utterance + ' ' + final_utility)
+    factor(utility)
+    return utterance
+  }
+ })
+}, 10000)
+
+var listener = function(utterance){
+  return Infer({method:'enumerate', model:function(){
+    var state = sample(statePrior)
+                  observe(speaker(state), utterance)
+                  return state
+                }})
+}
+
+var computeMarginals = function(distr, variables){
+  return map(function(s){
+  var p = marginal(s, variables)
+  return [p, Math.exp(distr.score(s))]
+  }, distr.support())
+}
+// map(function(s){
+//   print(marginal(s, ["S", "R"]))}, statePrior.support())
+
+// print('state prior: ')
+// viz.table(statePrior)
+
+// var variables = ["R"]
+// var u = "R>-S"
+// var u = "maybe R"
+// var LL = literalListener(u)
+// print('literal listener: ' + u)
+// viz.table(LL)
+// var marginals = computeMarginals(LL, variables)
+// print(marginals)
+
+
+// var x = map(function(s){
+//   var pt = marginal(s, ["T"])
+//   var pr = marginal(s, ["R"])
+//   print('P(T):' + pt + ' ' + 'P(R):' + pr)
+//   viz(speaker(s))
+// }, statePrior.support())
+
+// var PL = listener(u)
+// print('pragmatic listener: ' + u)
+// viz.table(PL)
+// var marginals = computeMarginals(PL, variables)
+// print(marginals)
+// marginals
+
+display(myDF["lt"])
+display(myDF["u"])
+display(myDF["vars"])
+
+
+var utt = myDF["u"][0]
+var posterior = myDF["lt"][0]== "PL" ? listener(utt) : literalListener(utt)
+// print('pragmatic listener: ' + u)
+// viz.table(PL)
+var marginals = computeMarginals(posterior, myDF["vars"])
+// print(marginals)
+marginals
