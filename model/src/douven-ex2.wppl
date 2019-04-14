@@ -15,7 +15,7 @@ var utteranceDict = {'literals': literals,
                     }
 var utterances = reduce(function(utts,acc){acc.concat(utts)},[],
                         Object.values(utteranceDict))
-// var printU = map(function(u){print(u)}, utterances)
+// var displayU = map(function(u){display(u)}, utterances)
 
 // conditional and marginal Probabilities
 var probabilities = {"cn1": {"p_clothes": {"S": 0.7, "-S": 0.1},
@@ -49,29 +49,14 @@ var tables = function(cn){
     var arr = map(function(token){jointProbs(token, cn)},
                   tokens)
     var elem = categorical({vs:tokens, ps:arr})
-    // C is observed
-//     condition(!elem.includes("-C"))
  return elem
 }})
 }
-// viz.table(tables("cn1"))
-
-var distr2Dict = cache(function(distr){
-   return {"-E-SC": Math.exp(distr.score("-E-SC")),
-           "-ESC": Math.exp(distr.score("-ESC")),
-           "E-SC": Math.exp(distr.score("E-SC")),
-           "ESC": Math.exp(distr.score("ESC")),
-           "-E-S-C": Math.exp(distr.score("-E-S-C")),
-           "-ES-C": Math.exp(distr.score("-ES-C")),
-           "E-S-C": Math.exp(distr.score("E-S-C")),
-           "ES-C": Math.exp(distr.score("ES-C"))}
-})
 
 var states = function(cn){
   var distr = tables(cn)
-  var state = distr2Dict(distr)
   return {"cn": cn,
-          "table": state
+          "table": distr
          }
 }
 
@@ -90,14 +75,14 @@ var intersect_arrays = function(arrays){
 }
 
 var marginal = function(state, variables){
-  var tokens = Object.keys(state)
-  var all_keys = map(function(v){
+  var tokens = state.support()
+  var all_x = map(function(v){
     v.includes("-") ? filter(function(k){k.includes(v)}, tokens) :
                       filter(function(k){!k.includes("-"+v)}, tokens)
   }, variables)
-  var keys = intersect_arrays(all_keys)
+  var xs = intersect_arrays(all_x)
 
-  return reduce(function(k, acc){acc + state[k]}, 0, keys)
+  return reduce(function(x, acc){acc + Math.exp(state.score(x))}, 0, xs)
 }
 
 var utteranceProbs = cache(function(utterance, state){
@@ -143,19 +128,19 @@ var costs = function(utt){
   var c3 = (utt.split('-').length-1) * 0.125
   var c4 = utt.includes('maybe') ? 0.1 : 0
   var cost = c1 + c2 + c3 + c4
-//   print('cost: ' + cost)
+//   display('cost: ' + cost)
   return 0
 }
 
 var speaker = cache(function(state){
   return Infer({method:'enumerate', model: function(){
     var utterance = uniformDraw(utterances)
-//     print('utt: ' + utterance)
+//     display('utt: ' + utterance)
     var LL_score = literalListener(utterance).score(state)
-//     print('util:' + LL_score)
+//     display('util:' + LL_score)
     var utility = LL_score==-Infinity ? LL_score :
                              globalStore.alpha * (LL_score-costs(utterance))
-//     print(utterance + ' ' + final_utility)
+//     display(utterance + ' ' + final_utility)
     factor(utility)
     return utterance
   }
@@ -163,72 +148,88 @@ var speaker = cache(function(state){
 }, 10000)
 
 var computeMarginals = function(distr, variables){
-  return map(function(s){
-  var p = marginal(s, variables)
-  return [p, Math.exp(distr.score(s))]
+  return map(function(d){
+    var table = d["table"]
+  var p = marginal(table, variables)
+  return [p, Math.exp(distr.score(d))]
   }, distr.support())
 }
 
 var listener = function(utterance){
-  return Infer({method:'enumerate', model:function(){
+  var distr = Infer({method:'enumerate', model:function(){
     var state = sample(statePrior)
-    var m = marginal(state["table"], ["C"])
-    factor(Math.log(m))
     observe(speaker(state), utterance)
     return state
   }})
+
+  // listener has evidence for C
+  var ps = map(function(d){Math.exp(distr.score(d))}, distr.support())
+  var vs = map(function(x){
+    var old_table = x["table"]
+    var new_table = Infer({model:function(){
+      var entry = sample(old_table)
+      condition(!entry.includes("-C"))
+      return entry
+    }})
+    return {"cn": x["cn"], "table": new_table}
+    }, distr.support())
+
+  var new_distr = Infer({model:function(){
+    categorical({vs, ps})
+  }})
+  return new_distr
+//   return distr
 }
 
 
+
 // map(function(s){
-//   print(marginal(s, ["S", "R"]))}, statePrior.support())
+//   display(marginal(s, ["S", "R"]))}, statePrior.support())
+// var variables = ["E"]
 
-print('state prior: ')
-viz.table(statePrior)
-var variables = ["C"]
-var marginals = computeMarginals(marginalize(statePrior, "table"), variables)
-print('P(C):')
-print(marginals)
+// display('state prior: ')
+// viz.table(statePrior)
+// var marginals = computeMarginals(statePrior, variables)
+// display('P(C):')
+// display(marginals)
 
 
-var u = "E>S"
-var LL = literalListener(u)
-print('literal listener: ' + u)
-viz.table(LL)
-var LL_table = marginalize(LL, "table")
-// viz.table(LL_table)
-var variables = ["E"]
-var marginals = computeMarginals(LL_table, variables)
-print('P(E):')
-print(marginals)
-
+// var u = "E>S"
+// var LL = literalListener(u)
+// display('literal listener: ' + u)
+// viz.table(LL)
+// var marginals = computeMarginals(LL, variables)
+// display('P(C):')
+// print(marginals)
+// var marginals = computeMarginals(LL, ["E"])
+// display('P(E):')
+// print(marginals)
 
 // var x = map(function(s){
 // //   var pe = marginal(s["table"], ["E"])
-// //   print('P(E):' + pe)
-//   print(s)
+// //   display('P(E):' + pe)
+//   display(s)
 // //   viz(speaker(s))
 //   viz.table(literalListener(s))
 // }, utterances)//statePrior.support())
 
-var PL = listener(u)
-print('pragmatic listener: ' + u)
-viz.table(PL)
-var PL_table = marginalize(PL, "table")
-viz.table(PL_table)
-var marginals = computeMarginals(PL_table, variables)
-print('P(E):')
-print(marginals)
+// var PL = listener(u)
+// display('pragmatic listener: ' + u)
+// viz.table(PL)
 
-// display(myDF["lt"])
-// display(myDF["u"])
-// display(myDF["vars"])
+// var marginals = computeMarginals(PL, ["C"])
+// display('P(C):')
+// print(marginals)
+// var marginals = computeMarginals(PL, ["E"])
+// display('P(E):')
+// print(marginals)
+
+display(myDF["lt"])
+display(myDF["u"])
+display(myDF["vars"])
 
 
-// var utt = myDF["u"][0]
-// var posterior = myDF["lt"][0]== "PL" ? listener(utt) : literalListener(utt)
-// // print('pragmatic listener: ' + u)
-// // viz.table(PL)
-// var marginals = computeMarginals(posterior, myDF["vars"])
-// // print(marginals)
-// marginals
+var utt = myDF["u"][0]
+var posterior = myDF["lt"][0]== "PL" ? listener(utt) : literalListener(utt)
+var marginals = computeMarginals(posterior, myDF["vars"])
+marginals
