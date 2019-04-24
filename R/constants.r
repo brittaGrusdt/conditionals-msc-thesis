@@ -17,7 +17,15 @@ UTT_ORDER_BY_COST <- c("A", "C", "likely A", "likely C", "-A", "-C",
 
 CP_THETAS <- c(0.1, 0.2, 0.3, 0.4, 0.5)
 
-NB_WEBPPL_SAMPLES <- 100000
+NB_WEBPPL_SAMPLES <- 1000000
 
 THETA_TRUE <- 0.9
 THETA_FALSE <- 1-THETA_TRUE
+
+LABELS <- data.frame(pca=c("P(A,C)"), pcna="P(-A,C)", pnca="P(A,-C)", pncna="P(-A,-C)",
+                    pc="P(C)",  pa="P(A)",
+                    pCgivenA="P(C|A)", pAgivenC= "P(A|C)", pCgivenNA="P(C|-A)",  pAgivenNC="P(A|-C)",
+                    pNCgivenNA="P(-C|-A)", pNAgivenNC="P(-A|-C)", stringsAsFactors = FALSE)
+
+
+
