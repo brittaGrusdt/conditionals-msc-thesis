@@ -231,17 +231,17 @@ var listener = function(utterance){
                 }})
 }
 
-// display('state prior: ')
+// print('state prior: ')
 // viz.table(statePrior)
 
 // var variables = ["R"]
 // var u = "R>-S"
 // // // var u = "maybe R"
 // var LL = literalListener(u)
-// display('literal listener: ' + u)
+// print('literal listener: ' + u)
 // viz.table(LL)
 // var m = computeMarginals(LL, variables)
-// display(m)
+// print(m)
 
 // var x = map(function(s){
 //   display(s)
@@ -260,18 +260,18 @@ var listener = function(utterance){
 
 
 // var PL = listener(u)
-// display('pragmatic listener: ' + u)
+// print('pragmatic listener: ' + u)
 // viz.table(PL)
 // var marginals = computeMarginals(PL, variables)
-// display(marginals)
+// print(marginals)
 
-// display(myDF["lt"])
-// display(myDF["u"])
-// display(myDF["vars"])
+display(myDF["lt"])
+display(myDF["u"])
+display(myDF["vars"])
 
 
 var utt = myDF["u"][0]
-var posterior = myDF["lt"][0]== "PL" ? listener(utt) : literalListener(utt)
+var posterior = myDF["lt"][0]== "PL" ? listener(utt) : myDF["lt"][0]=="prior" ? statePrior : literalListener(utt)
 // display('pragmatic listener: ' + u)
 // viz.table(PL)
 var marginals = computeMarginals(posterior, myDF["vars"])
