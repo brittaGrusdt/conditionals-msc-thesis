@@ -10,13 +10,16 @@ source("webppl-model.R")
 source("helpers.R")
 library(rwebppl)
 
-create_target_dirs("plots")
-create_target_dirs("data-samples")
-create_target_dirs("data-models")
+fn <- "dirichlet-025"
+
+create_target_dirs("plots", folder=fn)
+create_target_dirs("data-samples", folder=fn)
+create_target_dirs("data-model", folder=fn)
+create_target_dirs("data-SE", folder=fn)
 ```
 
 ```{r run-model-function}
-run_model <- function(lts, biases, alphas, n_runs=3, lawn_theta=0.05, bn_str='{table:[], cn:""}'){
+run_model <- function(lts, biases, alphas, n_runs=3, lawn_theta=0.05, target_folder='', bn_str='{table:[], cn:""}'){
   for(lt in lts){
     for(bias in biases) {
       for(alpha in alphas){
@@ -38,8 +41,8 @@ run_model <- function(lts, biases, alphas, n_runs=3, lawn_theta=0.05, bn_str='{t
           posterior <- webppl(webppl_model, random_seed=SEEDS[i])
           samples <- getSampleProbs(lt, posterior)
           
-          target_model <-  get_target_dir("data-model", i)
-          target_samples <- get_target_dir("data-samples", i) 
+          target_model <-  get_target_dir("data-model", target_folder, n_run=i)
+          target_samples <- get_target_dir("data-samples", target_folder, n_run=i) 
 
           saveRDS(samples, paste(target_samples, fn, "-run-", i, "-samples.rds", sep=""))
           saveRDS(posterior, paste(target_model, fn, "-run-", i, "-model.rds", sep=""))
@@ -52,7 +55,7 @@ run_model <- function(lts, biases, alphas, n_runs=3, lawn_theta=0.05, bn_str='{t
   }
 }
 
-runSpeakerExpectation <- function(conditions, bias, alpha, n_run=1, lawn_theta=0.05){
+runSpeakerExpectation <- function(conditions, bias, alpha, n_run=1, target_folder='', lawn_theta=0.05){
   for(condition in conditions){
     params_str <- setup(bias, "dummy", "SE", alpha, lawn_theta)
     var_condition <- paste('var condition = "', condition, '"', sep="")
@@ -68,38 +71,46 @@ runSpeakerExpectation <- function(conditions, bias, alpha, n_run=1, lawn_theta=0
     idx <- which(likelihoods.df$x!=0)
     likelihoods.df <- likelihoods.df[idx,]
     
-    target_dir <- paste("../data/seed-", SEEDS[n_run], "/", sep="")
-    fn <- get_filename(bias, "PL", alpha, n_run, lawn_theta)
+    # target_dir <- paste("../data/seed-", SEEDS[n_run], "/", sep="")
+    # fn <- get_filename(bias, "PL", alpha, n_run, lawn_theta)
+    target_dir <- get_target_dir("data-SE", target_folder, n_run)
+    
     saveRDS(likelihoods.df, paste(target_dir, fn, "-SE-", condition, ".rds", sep=""))
   }
 }
 
 ```
 
-```{r run-model}
-listenerTypes <- c("prior", "LL", "PL")
-biases <- c("none", "lawn", "pizza", "douven1")
-alphas = c(1, 3, 5, 10, 20)
-run_model(listenerTypes, biases, alphas)
+```{r run-model, echo=FALSE}
+# listenerTypes <- c("prior", "LL", "PL")
+# biases <- c("none", "lawn", "pizza", "douven1")
+# alphas = c(1, 3, 5, 10, 20)
+# run_model(listenerTypes, biases, alphas)
 
 # Run model with bias=lawn with various bias thresholds
-lawnThetas <- c(0.1, 0.2, 0.3, 0.4, 0.5)
-for(theta in lawnThetas){
-  run_model(listenerTypes, c("lawn"), alphas, lawn_theta=theta)
-}
+# lawnThetas <- c(0.1, 0.2, 0.3, 0.4, 0.5)
+# for(theta in lawnThetas){
+#   run_model(listenerTypes, c("lawn"), alphas, lawn_theta=theta)
+# }
 
 # TEST
 listenerTypes <- c("prior", "LL", "PL")
-biases <- c("lawn") #, "lawn", "pizza", "douven1")
+# listenerTypes <- c("LL", "PL")
+biases <- c("none", "lawn", "pizza", "douven1")
 alphas <- c(5)
 n_runs <- 1
-run_model(listenerTypes, biases, alphas, n_runs=1)
+run_model(listenerTypes, biases, alphas, target_folder=fn, n_runs=1)
 
 ```
 
-```{r run-speaker-expectation}
-runSpeakerExpectation("no-condition", "douven1", 5)
-runSpeakerExpectation("no-condition", "none", 5)
+```{r run-speaker-expectation, echo=FALSE}
+# runSpeakerExpectation("no-condition", "douven1", 5)
+runSpeakerExpectation("pc", "none", 5)
+# runSpeakerExpectation("pcna", "none", 5)
+runSpeakerExpectation("pca", "none", 5)
+
+# runSpeakerExpectation("no-condition", "none", 5)
+
 ```
 
 

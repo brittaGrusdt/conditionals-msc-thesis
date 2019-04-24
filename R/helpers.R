@@ -1,20 +1,26 @@
 source("constants.r")
 
-create_target_dirs <- function(which_data, runs=seq(1,3)){
+create_target_dirs <- function(which_data, folderName='', runs=seq(1,3)){
   # which_data: plots, data-model, data-samples
   for(i in runs){
-    target_plots <- get_target_dir(which_data, i)
-    checkAndCreateDir(target_plots)
+    target <- get_target_dir(which_data, folderName, i)
+    checkAndCreateDir(target)
   }
 }
 
-get_target_dir <- function(which_data, n_run=1){
+get_target_dir <- function(which_data, folderName='', n_run=1){
+  if(folderName==''){folderName <- '/'}
+  else{folderName <- paste('/', folderName, '/',sep="")}
+  
   if(which_data=="data-model"){
-    dir <- paste("../data/seed-", SEEDS[n_run], "/model/", sep="")
+    dir <- paste("../data/seed-", SEEDS[n_run], "/model", folderName, sep="")
   }else if(which_data=="data-samples"){
-    dir <- paste("../data/seed-", SEEDS[n_run], "/samples/", sep="")
-  }else{
-    dir <- paste("../plots/seed-", SEEDS[n_run], "/", sep="")
+    dir <- paste("../data/seed-", SEEDS[n_run], "/samples", folderName, sep="")
+  }else if(which_data=="data-SE"){
+    dir <- paste("../data/seed-", SEEDS[n_run], "/speakerExpectation", folderName, sep="")
+  }
+  else{
+    dir <- paste("../plots/seed-", SEEDS[n_run], folderName, sep="")
   }
   return(dir)
 }
@@ -33,21 +39,33 @@ get_filename <- function(bias, lt, alpha, n_run, lawn_theta=0.05){
   return(fn)
 }
 
-read_data <- function(bias, lt, n_run, alpha=5, lawn_theta=0.05, samples=TRUE){
+read_data <- function(bias, lt, n_run, alpha=5, lawn_theta=0.05, folderName="", samples=TRUE){
   type <- "samples"
   if(!samples){type <- "model"}
   
-  target_dir <- paste("../data/seed-", SEEDS[n_run], "/", type, "/", sep="")  
+  # target_dir <- paste("../data/seed-", SEEDS[n_run], "/", type, "/", sep="")  
+  target_dir <- get_target_dir(paste("data-", type, sep=""), folderName, n_run)
   fn <- get_filename(bias, lt, alpha, n_run, lawn_theta)
   data <- readRDS(paste(target_dir, fn, "-", type, ".rds", sep=""))
   return(data)
 }
 
-get_samples_LL_PL <- function(bias, alpha, n_run, lawn_theta=0.05){
-  samples_ll <- read_data(bias, "LL", n_run, alpha, lawn_theta)
-  samples_pl <- read_data(bias, "PL", n_run, alpha, lawn_theta)
+getSamples <- function(bias, alpha, n_run, lawn_theta=0.05, folderName="", which_lt=c("LL", "PL", "prior")){
   
-  df <- rbind(samples_ll, samples_pl)
+  df <- data.frame()
+  if('prior' %in% which_lt){ 
+    samples <- read_data(bias, "prior", n_run, alpha, lawn_theta, folderName)
+    df <- rbind(df, samples)
+  }
+  if('LL' %in% which_lt){
+    samples <- read_data(bias, "LL", n_run, alpha, lawn_theta, folderName)
+    df <- rbind(df, samples)
+  }
+  if('PL' %in% which_lt){ 
+    samples <- read_data(bias, "PL", n_run, alpha, lawn_theta, folderName)
+    df <- rbind(df, samples)
+  }
+
   return(df)
 }
 
