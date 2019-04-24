@@ -78,7 +78,7 @@ return p
 priors <- '
 var tablesPrior = mem(function(){
 return Infer({method:"forward", samples:10000, model:function(){
-var alpha = Vector(repeat(4, constF(0.25)));
+var alpha = Vector(repeat(4, constF(1)));
 var vec = dirichlet({alpha})
 var table = Object.values(vec.data)
 // var table = map2(roundToN, table, [4,4,4,4])
@@ -162,8 +162,8 @@ var costs = function(utt){
 if(!utterances.includes(utt)){error("unknown utterance " + utt)}
 var c1 = utt.includes("If") ? 0.55 : 0
 var c2 = utt.includes("and") || utt.includes("but") ? 0.25 : 0
-var c3 = utt.includes("-A") ? 0.125 : 0
-var c4 = utt.includes("-C") ? 0.125 : 0
+var c3 = utt.includes("-A") || utt.includes("neither") ? 0.125 : 0
+var c4 = utt.includes("-C") || utt.includes("nor") ? 0.125 : 0
 var c5 = utt.includes("likely") ? 0.1 : 0
 var cost = c1 + c2 + c3 + c4 + c5
 
