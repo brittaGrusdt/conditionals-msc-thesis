@@ -17,17 +17,31 @@ require(gridExtra)
 ALPHA <- 5
 N_RUN <- 1
 SAVE <- TRUE
+
+TARGET_FN <- 'dirichlet-1'
 ```
+
+
+
 
 ```{r plot_helper-functions, echo=FALSE}
 get_pc_pa_mus <- function(df){
   mu_pc <- ddply(df, "lt", summarise, grp.mean=mean(pc))
   mu_pa <- ddply(df, "lt", summarise, grp.mean=mean(pa))
   
-  mu_pc$variable <- c("pc","pc")
-  mu_pa$variable <- c("pa","pa")
+  # mu_pc <- rename(mu_pc, c("grp.mean"="pc"))
+  mu_pc$variable <- rep("pc",dim(mu_pc)[1])
+  mu_pa$variable <- rep("pa",dim(mu_pa)[1])
+  
   mus <- rbind(mu_pc,mu_pa)
   return(mus)
+}
+
+getMeanByLT <- function(df, col, which_lt){
+  dataByLT <- df %>% filter(lt==which_lt)
+  score <- mean(dataByLT[[col]])
+  data  <- data.frame(score=score, lt=which_lt)
+  return(data)
 }
 
 splitFacet <- function(x){
@@ -46,7 +60,7 @@ splitFacet <- function(x){
 savePlot <- function(bias, lt, alpha, n_run, width, height, fn_main='', lawn_theta=0.05){
   fn_id <- paste(get_filename(bias, "PL", alpha, n_run, lawn_theta))
   # target_dir <- paste("../plots/seed-", SEEDS[n_run], "/", sep="")
-  target_dir <- get_target_dir("plots", n_run)
+  target_dir <- get_target_dir("plots", TARGET_FN, n_run)
   target <- paste(target_dir, fn_id, fn_main, '.png', sep="")
   ggsave(target, width = 4, height=2.5)
   print(paste('saved plot to', target))
@@ -54,10 +68,10 @@ savePlot <- function(bias, lt, alpha, n_run, width, height, fn_main='', lawn_the
 ```
 
 ```{r plot_functions, message=FALSE, echo=FALSE}
-plot_pc_pa_facet_lt <- function(bias, alpha, n_run, lawn_theta=0.05){
-  print("data for PL and LL needed!")
+plot_pc_pa_facet_lt <- function(bias, alpha, n_run, lawn_theta=0.05, folderName=""){
+  warning("data for PL and LL needed!")
   # ---- facet for LL and PL ----- #
-  df <- get_samples_LL_PL(bias, alpha, n_run, lawn_theta)
+  df <- getSamples(bias, alpha, n_run, lawn_theta, folderName=folderName, which_lt = c("LL", "PL"))
   mus <- get_pc_pa_mus(df)
   
   df.long <-melt(df[,c("pc","pa","lt","cn")],id.vars=c("lt","cn"), measure.vars=c("pc","pa"))
@@ -66,15 +80,15 @@ plot_pc_pa_facet_lt <- function(bias, alpha, n_run, lawn_theta=0.05){
        geom_vline(data=mus, aes(xintercept=grp.mean, color=variable), linetype="dashed") +
        theme(legend.title=element_blank(),text = element_text(size=8))
   p
-  if(SAVE){savePlot(bias, "PL", alpha, n_run, 4, 2.5, "-pc-pa-facet-lt", lawn_theta)}
+  if(SAVE){savePlot(bias, "PL", alpha, n_run, 6, 3, "-pc-pa-facet-lt", lawn_theta)}
 
   return(p)
 }
 
-plot_pc_pa_facet_p <- function(bias, alpha, n_run, lawn_theta=0.05){
-  print("data for PL and LL needed!")
+plot_pc_pa_facet_p <- function(bias, alpha, n_run, lawn_theta=0.05, folderName=""){
+  warning("data for PL and LL needed!")
   # ----- facet for P(C) and P(A) ---- #
-  df <- get_samples_LL_PL(bias, alpha, n_run, lawn_theta)
+  df <- getSamples(bias, alpha, n_run, lawn_theta, folderName=folderName, which_lt = c("LL", "PL"))
   mus <- get_pc_pa_mus(df)
   
   df.long <-melt(df[,c("pc","pa","lt","cn")],id.vars=c("lt","cn"), measure.vars=c("pc","pa"))
@@ -88,8 +102,8 @@ plot_pc_pa_facet_p <- function(bias, alpha, n_run, lawn_theta=0.05){
   return(p)
 }
 
-plotHist <- function(proposition, bias, lt, n_run, title, from, to, alpha=5, bins=20){
-  samples <- read_data(bias, lt, n_run, alpha, lawn_theta)
+plotHist <- function(proposition, bias, lt, n_run, title, from, to, alpha=5, bins=20, folderName=""){
+  samples <- read_data(bias, lt, n_run, alpha, lawn_theta, folderName)
   
   if(proposition=='A'){
     indices_in_interval <- getInterval(samples$pa, from, to)
@@ -119,8 +133,8 @@ plotHist <- function(proposition, bias, lt, n_run, title, from, to, alpha=5, bin
   return(p)
 }
 
-plotTables <- function(bias, lt, n_run, alpha, lawn_theta=0.05){
-  data_samples <- read_data(bias, lt, n_run, alpha, lawn_theta)
+plotTables <- function(bias, lt, n_run, alpha, lawn_theta=0.05, folderName=""){
+  data_samples <- read_data(bias, lt, n_run, alpha, lawn_theta, folderName)
   t0 <- data_samples$pca 
   t1 <- data_samples$pcna
   t2 <- data_samples$pnca
@@ -146,8 +160,8 @@ plotTables <- function(bias, lt, n_run, alpha, lawn_theta=0.05){
   return(p)
 }
 
-plotCNs <- function(bias, lt, n_run, alpha, lawn_theta=0.05){
-  data_samples <- read_data(bias, lt, n_run, alpha, lawn_theta)
+plotCNs <- function(bias, lt, n_run, alpha, lawn_theta=0.05, folderName=""){
+  data_samples <- read_data(bias, lt, n_run, alpha, lawn_theta, folderName)
   
   df <- as.data.frame(data_samples$cn)
   df <- count(df)
@@ -166,8 +180,8 @@ plotCNs <- function(bias, lt, n_run, alpha, lawn_theta=0.05){
   return(p)
 }
 
-plotCNs_LLPL <- function(bias, alpha, n_run, lawn_theta=0.05){
-  df <- get_samples_LL_PL(bias, alpha, n_run, lawn_theta)
+plotCNs_LLPL <- function(bias, alpha, n_run, folderName="", lawn_theta=0.05){
+  df <- getSamples(bias, alpha, n_run, lawn_theta, folderName)
   ll_cn <- as.data.frame(table(filter(df, lt=='LL')$cn))
   ll_cn$lt <- rep("LL", nrow(ll_cn))
   ll_cn$Freq <- round(x=ll_cn$Freq / sum(ll_cn$Freq), digits=2)
@@ -186,12 +200,12 @@ plotCNs_LLPL <- function(bias, alpha, n_run, lawn_theta=0.05){
         facet_wrap(~lt)
   
   p
-  if(SAVE){savePlot(bias, "PL", alpha, n_run, 4, 6, "-facet-lt-cns", lawn_theta)}
+  if(SAVE){savePlot(bias, "PL", alpha, n_run, 5, 3.5, "-facet-lt-cns", lawn_theta)}
   return(p)
 }
 
-plotTableDensityAllCNs <- function(bias, lt, n_run, alpha, lawn_theta=0.05){
-  data_samples <- read_data(bias, lt, n_run, alpha, lawn_theta)
+plotTableDensityAllCNs <- function(bias, lt, n_run, alpha, lawn_theta=0.05, folderName=""){
+  data_samples <- read_data(bias, lt, n_run, alpha, lawn_theta, folderName)
 
   keep <- c("pca","pcna","pnca","pncna", "cn")
   data <- data_samples[keep]
@@ -221,8 +235,8 @@ plotTableDensityAllCNs <- function(bias, lt, n_run, alpha, lawn_theta=0.05){
   }
   g <- do.call(arrangeGrob, c(p, top=paste(bias,lt,sep="-")))  
   if(SAVE){
-    target_dir <- paste("../plots/seed-", SEEDS[n_run], "/", sep="")
     fn <- get_filename(bias, lt, alpha, n_run, lawn_theta)
+    target_dir <- get_target_dir("plots", TARGET_FN, n_run)
     target <- paste(target_dir, fn, "-table-densities.png", sep="")
     ggsave(file=target, g, width=5.5, height=7)
   }
@@ -230,8 +244,9 @@ plotTableDensityAllCNs <- function(bias, lt, n_run, alpha, lawn_theta=0.05){
   return(g)
 }
 
-plotConditionalProbsDensities <- function(which_densities, bias, lt, n_run, alpha, lawn_theta=0.05){
-  df <- read_data(bias, lt, n_run, alpha, lawn_theta)
+plotConditionalProbsDensities <- function(which_densities, bias, lt, n_run, alpha, lawn_theta=0.05,
+                                          folderName=""){
+  df <- read_data(bias, lt, n_run, alpha, lawn_theta, folderName)
   
   # Density plots of conditional probabilities for PL and LL
   if(which_densities=='cp'){
@@ -261,6 +276,49 @@ plotConditionalProbsDensities <- function(which_densities, bias, lt, n_run, alph
   ggsave(file=target, p, width=4, height=2.5)
   return(p)  
 }
+
+plotStrength <- function(biases, alpha, scoreProperty, n_run=1, folderName="", lawn_theta=0.05){
+  data <- data.frame()
+  for(bias in biases){
+    df <- getSamples(bias, alpha, n_run, lawn_theta, folderName)
+    pl <- getMeanByLT(df, scoreProperty, "PL")
+    ll <- getMeanByLT(df, scoreProperty, "LL")
+    
+    df <- rbind(pl,ll)
+    df$bias <- c(bias,bias)
+    data <- rbind(data, df)
+  }
+  
+  strengths <- data.frame()
+  for(bias in biases){
+    indices <- which(data$bias==bias)
+    strength <- round(data[indices[1],"score"][1]/data[indices[2],"score"][1],3)
+    df <- data.frame(bias=c(bias), strength=c(strength))
+    strengths <- rbind(strengths, df)
+  }
+  
+  p <- ggplot(data=data, aes(x=bias, y=score, fill=lt)) +
+      geom_bar(stat="identity", position=position_dodge()) +
+      theme(text = element_text(size=8), legend.title = element_blank()) +
+      scale_x_discrete(labels=biases) + 
+      ylab('Expected Value') +
+      #geom_text(aes(label=LABELS[[scoreProperty]]), position = position_dodge(width = 1), vjust = -0.4, size=1.5) +
+      annotate("text", x = seq(1,length(biases)), y = rep(0.05,length(biases)), label=strengths$strength , size=2) +
+      ggtitle(LABELS[[scoreProperty]]) 
+p
+if(SAVE){savePlot(bias, "PL", alpha, n_run, 4, 2.5, paste("-", scoreProperty, "-strengths", sep=""), lawn_theta)}
+return(p)
+}
+
+plotDistributions <- function(bias, alpha, which_p, n_run=1, folderName="", lawn_theta=0.05){
+  df <- getSamples(bias, alpha, n_run, lawn_theta, folderName)
+  p <- ggplot(df, aes(x=df[,which_p])) +
+       geom_density(alpha=.2) + facet_wrap(~lt, scales="free_y") + xlab('') +
+       # geom_vline(data=mus, aes(xintercept=grp.mean, color=variable), linetype="dashed") +
+       theme(legend.title=element_blank(),text = element_text(size=8))
+  p
+  return(p)
+}
 ```
 
 
@@ -287,7 +345,7 @@ visualizeSpeakerExpectation <- function(condition, bias, alpha, n_run, lawn_thet
 Plot distributions P(C) and P(A) for the literal and the pragmatic listener respectively without assuming any particular bias for the utterance *If A, C*. 
 
 ```{r Uncertainty_A_C_1}
-p <-plot_pc_pa_facet_lt("none", ALPHA, N_RUN)
+p <-plot_pc_pa_facet_lt("none", ALPHA, N_RUN, folderName = "dirichlet-1")
 p
 all_plots <- splitFacet(p)
 all_plots[[1]]
@@ -305,10 +363,10 @@ Sample 1000 Bayes nets from the prior distribution: once with prior conditioned 
 For each of these Bayes nets, consider P<sub>S</sub>.
 
 ```{r speaker}
-visualizeSpeakerExpectation("pca", "none", ALPHA, N_RUN)
-visualizeSpeakerExpectation("pcna", "none", ALPHA, N_RUN)
-visualizeSpeakerExpectation("pc", "none", ALPHA, N_RUN)
-visualizeSpeakerExpectation("pnc", "none", ALPHA, N_RUN)
+# visualizeSpeakerExpectation("pca", "none", ALPHA, N_RUN)
+# visualizeSpeakerExpectation("pcna", "none", ALPHA, N_RUN)
+# visualizeSpeakerExpectation("pc", "none", ALPHA, N_RUN)
+# visualizeSpeakerExpectation("pnc", "none", ALPHA, N_RUN)
 ```
 
 Plot prior distribution for each entry of the probability tables.
@@ -341,8 +399,8 @@ plotCNs_LLPL("none", ALPHA, N_RUN)
 ```{r Biscuit_Conditionals}
 p <- plot_pc_pa_facet_p("pizza", ALPHA, N_RUN)
 p
-# all_plots <- splitFacet(p)
-# all_plots[[1]]
+all_plots <- splitFacet(p)
+all_plots[[1]]
 # all_plots[[2]]
 ```
 
@@ -352,20 +410,29 @@ p
 plotCNs_LLPL("lawn", ALPHA, N_RUN)
 plotConditionalProbsDensities("cp", "lawn", "PL", N_RUN, ALPHA)
 plotConditionalProbsDensities("cp", "lawn", "LL", N_RUN, ALPHA)
+
+plotStrength(c("lawn", "none"), ALPHA, "pNCgivenNA", N_RUN, folderName = "dirichlet-025")
+plotStrength(c("lawn", "none"), ALPHA, "pAgivenC", N_RUN, folderName="dirichlet-025")
+
 ```
 
 ```{r Indicative-conditionals-context, message=FALSE}
 plot_pc_pa_facet_lt("douven1", ALPHA, N_RUN)
 plotCNs_LLPL("douven1", ALPHA, N_RUN)
-visualizeSpeakerExpectation("no-condition", "douven1", ALPHA, N_RUN)
+# visualizeSpeakerExpectation("no-condition", "douven1", ALPHA, N_RUN)
+# visualizeSpeakerExpectation("no-condition", "none", ALPHA, N_RUN)
+
 ```
+
 
 ## Discussion
 Plot distribution for each table entry conditioned on each causal network.
 
 ```{r discussion, message=FALSE}
-plotTableDensityAllCNs("none", "PL", N_RUN, ALPHA)
-plotTableDensityAllCNs("none", "prior", N_RUN, ALPHA)
-
+for(bias in c("none", "lawn", "douven1")){
+  plotTableDensityAllCNs(bias, "PL", N_RUN, ALPHA)
+  plotTableDensityAllCNs(bias, "prior", N_RUN, ALPHA)
+  plotTableDensityAllCNs(bias, "LL", N_RUN, ALPHA)
+}
 ```
 
